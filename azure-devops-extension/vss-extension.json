@@ -31,8 +31,8 @@
   "contributions": [
     {
       "id": "work-item-menu",
-      "type": "ms.vss-web.action-provider",
-      "description": "Model actions on the backlog, board and work item menus",
+      "type": "ms.vss-web.action",
+      "description": "Opens the Etalii Spec Kit chat for a work item",
       "targets": [
         "ms.vss-work-web.work-item-context-menu",
         "ms.vss-work-web.backlog-item-menu",
@@ -40,6 +40,9 @@
         "ms.vss-work-web.work-item-toolbar-menu"
       ],
       "properties": {
+        "text": "Etalii Spec Kit",
+        "title": "Work on this item's specification with a model",
+        "group": "contributed",
         "uri": "dist/menu.html",
         "registeredObjectId": "etalii-spec-kit-menu"
       }

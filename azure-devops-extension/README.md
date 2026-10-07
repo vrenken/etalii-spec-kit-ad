@@ -2,10 +2,11 @@
 
 Browser plugin for Azure Boards that goes with the `ado` Spec Kit extension
 ([`extensions/ado`](../extensions/ado/README.md)). It adds an **Etalii Spec
-Kit** group to the work item menu on the backlog, on board cards and on the
-work item form:
+Kit** entry to the work item menu on the backlog, on board cards and on the
+work item form. The entry opens a chat panel that offers the actions fitting
+that item's level:
 
-| Menu action | Offered on |
+| Action | Offered on |
 |---|---|
 | Generate specification | every level above tasks |
 | Subdivide into ... | portfolio levels, for example an epic into features |
@@ -18,9 +19,9 @@ work item form:
 The levels are read from the team's backlog configuration, so an Initiative
 level, or any other depth, works without configuring the plugin.
 
-## What a menu action does
+## What an action does
 
-Picking an action opens a chat panel for that one work item. The plugin sends
+After you pick an action in the panel, the plugin sends
 the item, its parent and its existing children to a model, and the model
 answers with a short message and a proposal:
 

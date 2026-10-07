@@ -3,6 +3,7 @@
 
 import * as SDK from "azure-devops-extension-sdk";
 import { getClient, type IExtensionDataManager, type IExtensionDataService } from "azure-devops-extension-api";
+import { WorkRestClient } from "azure-devops-extension-api/Work";
 import { WorkItemTrackingRestClient, type WorkItem } from "azure-devops-extension-api/WorkItemTracking";
 
 import {
@@ -26,9 +27,10 @@ import {
   systemPrompt,
 } from "./chat-model";
 import { type Conversation, startConversation } from "./llm";
-import { type Action, menuText, requestPatch } from "./model";
+import { type Action, actionsForLevel, childTypeFor, levelOf, levelsFromBacklogs, menuText, requestPatch } from "./model";
 
 interface PanelConfiguration {
+  /** Filled in when the user picks an action in the panel. */
   action: Action;
   id: number;
   project: string;
@@ -198,9 +200,10 @@ function renderProposal(): void {
 }
 
 function refreshControls(): void {
-  ($("send") as HTMLButtonElement).disabled = busy;
+  const chosen = Boolean(configuration.action);
+  ($("send") as HTMLButtonElement).disabled = busy || !chosen;
   ($("apply") as HTMLButtonElement).disabled = busy || !proposal;
-  ($("queue") as HTMLButtonElement).disabled = busy;
+  ($("queue") as HTMLButtonElement).disabled = busy || !chosen;
   $("apply").textContent = proposal?.kind === "analysis" ? "Add to discussion" : "Apply to Azure DevOps";
 }
 
@@ -246,6 +249,10 @@ async function ask(text: string, shown?: string): Promise<void> {
 }
 
 function begin(): void {
+  if (!configuration.action) {
+    showSettings(false);
+    return; // settings were saved before an action was picked
+  }
   const problem = settingsProblem(settings);
   if (problem) {
     showSettings(true, `Model settings are needed before the chat can start. ${problem}`);
@@ -255,6 +262,7 @@ function begin(): void {
   $("transcript").innerHTML = "";
   proposal = undefined;
   renderProposal();
+  refreshControls();
   conversation = startConversation(settings, systemPrompt(context));
   const notes = ($("notes") as HTMLTextAreaElement).value;
   addBubble("notice", `${escapeHtml(menuText(configuration.action, configuration.childType))} for <b>${escapeHtml(context.item.type)} ${context.item.id}</b>: ${escapeHtml(context.item.title)}`);
@@ -358,14 +366,51 @@ async function start(): Promise<void> {
   });
   $("close").addEventListener("click", () => configuration.panel?.close());
 
+  refreshControls();
   try {
-    await loadContext();
+    await showActions();
   } catch (error) {
     addBubble("error", `Could not load the work item: ${escapeHtml(error instanceof Error ? error.message : String(error))}`);
+  }
+}
+
+/** Offer the actions that fit this work item's level; the pick starts the chat. */
+async function showActions(): Promise<void> {
+  const { id, project } = configuration;
+  const [backlogs, workItem] = await Promise.all([
+    getClient(WorkRestClient).getBacklogConfigurations({ project, team: SDK.getTeamContext()?.name, projectId: "", teamId: "" }),
+    client().getWorkItem(id, project, ["System.WorkItemType", "System.Title"]),
+  ]);
+  const type = String(workItem.fields["System.WorkItemType"] ?? "");
+  configuration.levels = levelsFromBacklogs(backlogs);
+  configuration.level = levelOf(type, configuration.levels);
+  const actions = actionsForLevel(configuration.level, configuration.levels.length);
+  const picker = $("picker");
+  picker.hidden = false;
+  const title = `<b>${escapeHtml(type)} ${id}</b>: ${escapeHtml(String(workItem.fields["System.Title"] ?? ""))}`;
+  if (actions.length === 0) {
+    picker.innerHTML = `<p>${title}</p><p>There are no actions for a ${escapeHtml(type)}. Pick an item above the task level of your backlog.</p>`;
     return;
   }
-  refreshControls();
-  begin();
+  picker.innerHTML = `<p>${title}</p><p>What would you like the model to do?</p>`;
+  for (const action of actions) {
+    const childType = childTypeFor(action, configuration.level, configuration.levels);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = menuText(action, childType);
+    button.addEventListener("click", async () => {
+      picker.hidden = true;
+      configuration.action = action;
+      configuration.childType = childType;
+      try {
+        await loadContext();
+        begin();
+      } catch (error) {
+        addBubble("error", `Could not load the work item: ${escapeHtml(error instanceof Error ? error.message : String(error))}`);
+      }
+    });
+    picker.appendChild(button);
+  }
 }
 
 void start();

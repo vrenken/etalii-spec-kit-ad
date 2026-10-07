@@ -43,6 +43,8 @@
       button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
       button.link { border: none; color: var(--accent); padding: 2px 0; }
       button:disabled { opacity: 0.5; cursor: default; }
+      #picker button { display: block; width: 100%; text-align: left; margin: 0 0 6px; padding: 9px 12px; }
+      #picker p { margin: 0 0 10px; }
       [hidden] { display: none !important; }
     </style>
   </head>
@@ -67,6 +69,7 @@
       <div class="buttons"><button id="save-settings" type="button" class="primary">Save and start</button></div>
     </section>
     <main>
+      <div id="picker" hidden></div>
       <div id="transcript"></div>
       <div id="proposal" hidden></div>
     </main>
