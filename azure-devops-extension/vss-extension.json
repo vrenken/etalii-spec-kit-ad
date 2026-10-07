@@ -30,6 +30,21 @@
   ],
   "contributions": [
     {
+      "id": "menu-submenu",
+      "type": "ms.vss-web.action-provider",
+      "description": "A submenu with the actions that fit the selected work item",
+      "targets": [
+        "ms.vss-work-web.work-item-context-menu",
+        "ms.vss-work-web.backlog-item-menu",
+        "ms.vss-work-web.backlog-board-card-item-menu",
+        "ms.vss-work-web.work-item-toolbar-menu"
+      ],
+      "properties": {
+        "uri": "dist/menu.html",
+        "registeredObjectId": "etalii-spec-kit-submenu"
+      }
+    },
+    {
       "id": "menu-describe",
       "type": "ms.vss-web.action",
       "description": "Have a model write this item's specification",

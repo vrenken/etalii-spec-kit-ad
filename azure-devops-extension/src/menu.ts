@@ -8,9 +8,11 @@
 // the item's level and offers the ones that do when it does not.
 
 import * as SDK from "azure-devops-extension-sdk";
-import type { IHostPageLayoutService, IProjectPageService } from "azure-devops-extension-api";
+import { getClient, type IHostPageLayoutService, type IProjectPageService } from "azure-devops-extension-api";
+import { WorkRestClient } from "azure-devops-extension-api/Work";
+import { WorkItemTrackingRestClient } from "azure-devops-extension-api/WorkItemTracking";
 
-import { type Action, MENU_ACTIONS, menuText, selectedIds } from "./model";
+import { type Action, actionsForLevel, childTypeFor, levelOf, levelsFromBacklogs, MENU_ACTIONS, menuText, selectedIds } from "./model";
 
 // CommonServiceIds is a const enum, which has no runtime value to import.
 const SERVICES = {
@@ -46,6 +48,60 @@ async function open(action: Action, context: unknown): Promise<void> {
     });
   }
 }
+
+interface MenuItem {
+  id: string;
+  text: string;
+  title?: string;
+  childItems?: MenuItem[];
+  action?: () => void;
+}
+
+/** The actions that fit the selected item, named after its child level. */
+async function fittingItems(context: unknown): Promise<MenuItem[]> {
+  const ids = selectedIds(context);
+  if (ids.length !== 1) {
+    return [];
+  }
+  const projects = await SDK.getService<IProjectPageService>(SERVICES.project);
+  const project = (await projects.getProject())?.name;
+  if (!project) {
+    throw new Error("No project in context.");
+  }
+  const [backlogs, item] = await Promise.all([
+    getClient(WorkRestClient).getBacklogConfigurations({ project, team: SDK.getTeamContext()?.name, projectId: "", teamId: "" }),
+    getClient(WorkItemTrackingRestClient).getWorkItem(ids[0], project, ["System.WorkItemType"]),
+  ]);
+  const levels = levelsFromBacklogs(backlogs);
+  const level = levelOf(String(item.fields["System.WorkItemType"] ?? ""), levels);
+  return actionsForLevel(level, levels.length).map((action) => ({
+    id: `etalii-spec-kit-sub-${action}`,
+    text: menuText(action, childTypeFor(action, level, levels)),
+    action: () => void open(action, context),
+  }));
+}
+
+/**
+ * A submenu whose entries depend on the item. The lookups must never leave
+ * the menu empty or hanging: when they fail or take too long, every action is
+ * offered under its generic name and the dialog sorts out which one fits.
+ */
+async function submenu(context: unknown): Promise<MenuItem[]> {
+  const generic = (): MenuItem[] =>
+    MENU_ACTIONS.map((action) => ({
+      id: `etalii-spec-kit-sub-${action}`,
+      text: menuText(action),
+      action: () => void open(action, context),
+    }));
+  const timeout = new Promise<MenuItem[]>((resolve) => setTimeout(() => resolve(generic()), 2500));
+  const children = await Promise.race([fittingItems(context).catch(generic), timeout]);
+  if (children.length === 0) {
+    return []; // a task, another type outside the hierarchy, or a multi-selection
+  }
+  return [{ id: "etalii-spec-kit", text: "Etalii Spec Kit", title: "Work on this item's specification with a model", childItems: children }];
+}
+
+SDK.register("etalii-spec-kit-submenu", { getMenuItems: (context: unknown) => submenu(context) });
 
 for (const action of MENU_ACTIONS) {
   SDK.register(`etalii-spec-kit-${action}`, () => ({
