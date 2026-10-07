@@ -5,7 +5,7 @@ import { build } from "esbuild";
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist", { recursive: true });
 await build({
-  entryPoints: { menu: "src/menu.ts", dialog: "src/dialog.ts" },
+  entryPoints: { menu: "src/menu.ts", chat: "src/chat.ts" },
   outdir: "dist",
   bundle: true,
   format: "iife",

@@ -1,41 +1,25 @@
 // Adds an "Etalii Spec Kit" group to the work item menus on the backlog, the
-// board and the work item form. Picking an action does not run an agent in
-// the browser: it stores the request on the work item, where an agent session
-// running `speckit.ado.requests` picks it up.
+// board and the work item form. Picking an action opens a chat panel in which
+// a model proposes the result; the user applies it to Azure DevOps from there.
 
 import * as SDK from "azure-devops-extension-sdk";
-import {
-  getClient,
-  type IGlobalMessagesService,
-  type IHostPageLayoutService,
-  type IProjectPageService,
-} from "azure-devops-extension-api";
+import { getClient, type IHostPageLayoutService, type IProjectPageService } from "azure-devops-extension-api";
 import { WorkRestClient } from "azure-devops-extension-api/Work";
 import { WorkItemTrackingRestClient } from "azure-devops-extension-api/WorkItemTracking";
 
-import {
-  type Action,
-  childTypeFor,
-  commonActions,
-  levelOf,
-  levelsFromBacklogs,
-  menuText,
-  requestPatch,
-  selectedIds,
-} from "./model";
+import { type Action, actionsForLevel, childTypeFor, levelOf, levelsFromBacklogs, menuText, selectedIds } from "./model";
 
 // CommonServiceIds is a const enum, which has no runtime value to import.
 const SERVICES = {
   project: "ms.vss-tfs-web.tfs-page-data-service",
   layout: "ms.vss-features.host-page-layout-service",
-  messages: "ms.vss-tfs-web.tfs-global-messages-service",
 } as const;
+const PANEL_SIZE_LARGE = 2;
 
 interface MenuItem {
   id: string;
   text: string;
   title?: string;
-  disabled?: boolean;
   childItems?: MenuItem[];
   action?: () => void;
 }
@@ -60,54 +44,30 @@ async function hierarchy(project: string): Promise<string[][]> {
   return levelsFromBacklogs(configuration);
 }
 
-async function askForNotes(action: Action, count: number): Promise<string | undefined> {
+async function openChat(action: Action, id: number, project: string, levels: string[][], level: number): Promise<void> {
   const layout = await SDK.getService<IHostPageLayoutService>(SERVICES.layout);
-  const extension = SDK.getExtensionContext();
-  return new Promise((resolve) => {
-    layout.openCustomDialog<string | undefined>(`${extension.id}.request-dialog`, {
-      title: `${menuText(action)}: ${count === 1 ? "1 item" : `${count} items`}`,
-      configuration: { action },
-      onClose: (result) => resolve(result),
-    });
-  });
-}
-
-async function queue(action: Action, ids: number[], project: string): Promise<void> {
-  const notes = await askForNotes(action, ids.length);
-  if (notes === undefined) {
-    return; // cancelled
-  }
-  const client = getClient(WorkItemTrackingRestClient);
-  const messages = await SDK.getService<IGlobalMessagesService>(SERVICES.messages);
-  const failed: number[] = [];
-  for (const id of ids) {
-    try {
-      await client.updateWorkItem(requestPatch(action, notes), id, project);
-    } catch {
-      failed.push(id);
-    }
-  }
-  const queued = ids.length - failed.length;
-  messages.addToast({
-    duration: 6000,
-    message: failed.length
-      ? `Queued ${queued} of ${ids.length}. Could not update: ${failed.join(", ")}. Are the Etalii fields provisioned?`
-      : `Queued for an agent: ${menuText(action).toLowerCase()} (${queued}).`,
+  const childType = childTypeFor(action, level, levels);
+  layout.openPanel<void>(`${SDK.getExtensionContext().id}.chat-panel`, {
+    title: `Etalii Spec Kit: ${menuText(action, childType)}`,
+    size: PANEL_SIZE_LARGE,
+    configuration: { action, id, project, levels, level, childType },
   });
 }
 
 async function menuItems(context: unknown): Promise<MenuItem[]> {
   const ids = selectedIds(context);
-  if (ids.length === 0) {
+  // The chat is about one work item, so a multi-selection gets no menu.
+  if (ids.length !== 1) {
     return [];
   }
+  const [id] = ids;
   const project = await projectName();
-  const [levels, items] = await Promise.all([
+  const [levels, item] = await Promise.all([
     hierarchy(project),
-    getClient(WorkItemTrackingRestClient).getWorkItems(ids, project, ["System.WorkItemType"]),
+    getClient(WorkItemTrackingRestClient).getWorkItem(id, project, ["System.WorkItemType"]),
   ]);
-  const itemLevels = items.map((item) => levelOf(String(item.fields["System.WorkItemType"] ?? ""), levels));
-  const actions = commonActions(itemLevels, levels.length);
+  const level = levelOf(String(item.fields["System.WorkItemType"] ?? ""), levels);
+  const actions = actionsForLevel(level, levels.length);
   if (actions.length === 0) {
     return [];
   }
@@ -115,11 +75,11 @@ async function menuItems(context: unknown): Promise<MenuItem[]> {
     {
       id: "etalii-spec-kit",
       text: "Etalii Spec Kit",
-      title: "Ask an agent to work on the specification",
+      title: "Work on the specification with a model",
       childItems: actions.map((action) => ({
         id: `etalii-spec-kit-${action}`,
-        text: menuText(action, childTypeFor(action, itemLevels[0], levels)),
-        action: () => void queue(action, ids, project),
+        text: menuText(action, childTypeFor(action, level, levels)),
+        action: () => void openChat(action, id, project, levels, level),
       })),
     },
   ];

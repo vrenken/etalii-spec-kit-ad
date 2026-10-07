@@ -172,3 +172,43 @@ class TestLaunchers:
     @pytest.mark.skipif(not HAS_PWSH, reason="pwsh not available")
     def test_powershell(self, tmp_path: Path):
         _expect_setup_error(["pwsh", "-NoProfile", "-File", str(EXT_DIR / SCRIPTS[1]), "config-show"], tmp_path)
+
+
+class TestBrowserPluginStaysInStep:
+    """The browser plugin writes the same fields and labels the helper reads."""
+
+    PLUGIN = PROJECT_ROOT / "azure-devops-extension" / "src"
+
+    def _helper(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("ado_helper_for_plugin", EXT_DIR / "scripts" / "python" / "ado.py")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+
+    def _strings(self, name: str) -> set[str]:
+        text = (self.PLUGIN / name).read_text(encoding="utf-8")
+        # TypeScript writes glyphs as \u{1F916} or ⚙ escapes.
+        decoded = re.sub(r"[\\]u\{([0-9A-Fa-f]+)\}", lambda m: chr(int(m.group(1), 16)), text)
+        decoded = re.sub(r"[\\]u([0-9A-Fa-f]{4})", lambda m: chr(int(m.group(1), 16)), decoded)
+        return set(re.findall(r'"([^"\n]+)"', decoded))
+
+    def test_field_reference_names_exist_in_the_helper(self):
+        helper = self._helper()
+        known = {definition[0] for definition in helper.FIELD_DEFINITIONS}
+        used = {s for name in ("model.ts", "chat-model.ts") for s in self._strings(name) if s.startswith("Custom.Etalii")}
+        assert used and used <= known, used - known
+
+    def test_stored_labels_match_the_helper(self):
+        helper = self._helper()
+        strings = self._strings("model.ts") | self._strings("chat-model.ts")
+        for label in (
+            *helper.ASK_LABELS.values(),
+            helper.SPEC_STATE_LABELS["worked-on"],
+            helper.SPEC_STATE_LABELS["ready-for-review"],
+            helper.SPEC_STATE_LABELS["requires-finetuning"],
+            *helper.REQUEST_LABELS.values(),
+        ):
+            assert label in strings, label

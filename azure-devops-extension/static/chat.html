@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Etalii Spec Kit chat</title>
+    <style>
+      :root {
+        --bg: var(--background-color, #ffffff);
+        --fg: var(--text-primary-color, #201f1e);
+        --muted: var(--text-secondary-color, #605e5c);
+        --line: var(--palette-neutral-10, #e1dfdd);
+        --soft: var(--palette-neutral-4, #f3f2f1);
+        --accent: var(--communication-background, #0078d4);
+      }
+      html, body { height: 100%; margin: 0; }
+      body { display: flex; flex-direction: column; font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px; color: var(--fg); background: var(--bg); }
+      header { display: flex; justify-content: flex-end; padding: 0 0 6px; }
+      #settings { border: 1px solid var(--line); border-radius: 4px; padding: 12px; margin-bottom: 10px; }
+      #settings label { display: block; margin: 8px 0 3px; color: var(--muted); }
+      #settings input, #settings select { box-sizing: border-box; width: 100%; padding: 6px; font: inherit; }
+      #settings p { color: var(--muted); margin: 8px 0; }
+      #settings-message { color: #a4262c; min-height: 1.2em; }
+      main { flex: 1; overflow-y: auto; padding-right: 4px; }
+      .bubble { border-radius: 6px; padding: 8px 12px; margin: 0 0 8px; max-width: 92%; overflow-wrap: anywhere; }
+      .bubble p { margin: 0 0 6px; } .bubble p:last-child { margin-bottom: 0; }
+      .bubble.user { background: var(--accent); color: #fff; margin-left: auto; }
+      .bubble.assistant { background: var(--soft); }
+      .bubble.notice { background: transparent; color: var(--muted); border: 1px dashed var(--line); max-width: 100%; }
+      .bubble.error { background: #fde7e9; color: #8a1c22; max-width: 100%; }
+      .typing { color: var(--muted); font-style: italic; }
+      #proposal h3 { font-size: 13px; margin: 12px 0 6px; }
+      .card { border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; margin: 0 0 6px; }
+      .card h3, .card h4, .card h5, .card h6 { font-size: 13px; margin: 10px 0 4px; }
+      .card p { margin: 0 0 6px; } ul.card { padding-left: 28px; }
+      details.card summary { cursor: pointer; font-weight: 600; }
+      .after { font-weight: 400; color: var(--muted); margin-left: 8px; font-size: 12px; }
+      code { background: var(--soft); padding: 0 3px; border-radius: 2px; }
+      footer { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 6px; }
+      #notes { box-sizing: border-box; width: 100%; height: 64px; padding: 6px; font: inherit; resize: vertical; }
+      .buttons { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+      .spacer { flex: 1; }
+      button { font: inherit; padding: 6px 14px; border: 1px solid #8a8886; border-radius: 2px; background: var(--bg); color: var(--fg); cursor: pointer; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      button.link { border: none; color: var(--accent); padding: 2px 0; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <header><button id="open-settings" type="button" class="link">Model settings</button></header>
+    <section id="settings" hidden>
+      <div id="settings-message"></div>
+      <label for="provider">Provider</label>
+      <select id="provider">
+        <option value="anthropic">Claude (Anthropic)</option>
+        <option value="openai-compatible">Other (OpenAI-compatible API)</option>
+      </select>
+      <label for="model">Model</label>
+      <input id="model" type="text" autocomplete="off" />
+      <div id="base-url-row">
+        <label for="base-url">Base URL</label>
+        <input id="base-url" type="url" placeholder="https://api.openai.com/v1" autocomplete="off" />
+      </div>
+      <label for="api-key">API key</label>
+      <input id="api-key" type="password" autocomplete="off" />
+      <p>Stored for your Azure DevOps account only. The work item text is sent from your browser straight to this provider.</p>
+      <div class="buttons"><button id="save-settings" type="button" class="primary">Save and start</button></div>
+    </section>
+    <main>
+      <div id="transcript"></div>
+      <div id="proposal" hidden></div>
+    </main>
+    <footer>
+      <textarea id="notes" placeholder="Reply or ask for changes (Ctrl+Enter to send)"></textarea>
+      <div class="buttons">
+        <button id="send" type="button">Send</button>
+        <span class="spacer"></span>
+        <button id="queue" type="button" title="Store the request on the work item for an agent session that can read the code">Queue for an agent session</button>
+        <button id="apply" type="button" class="primary" disabled>Apply to Azure DevOps</button>
+        <button id="close" type="button">Close</button>
+      </div>
+    </footer>
+    <script src="chat.js"></script>
+  </body>
+</html>
