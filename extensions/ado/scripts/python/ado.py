@@ -31,6 +31,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -272,13 +273,43 @@ def read_environment(name: str) -> str:
     return stored.strip() if isinstance(stored, str) else ""
 
 
+def store_token(name: str, *, interactive: bool, prompt: Callable[[str], str]) -> dict[str, Any]:
+    """Ask the user for the token and store it in their own environment.
+
+    Meant to be run by the user in their own terminal. It refuses to run
+    without one, so an agent can never be the party that types or sees the
+    token. Nothing is written to the project.
+    """
+    if not interactive:
+        raise AdoError(
+            "token-set must be run by the user in their own terminal, so that the token is never "
+            "shown to an agent or written to a file in the project."
+        )
+    token = prompt(f"Personal access token to store in {name} (input is hidden): ").strip()
+    if not token:
+        raise AdoError("No token entered; nothing was stored.")
+    if sys.platform != "win32":
+        # There is no one place that every shell reads, and editing a shell
+        # profile behind the user's back is not ours to do.
+        return {
+            "stored": False,
+            "variable": name,
+            "next": f"Add `export {name}=<token>` to your shell profile, or to your secret manager, and open a new terminal.",
+        }
+    import winreg
+
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_SET_VALUE) as key:
+        winreg.SetValueEx(key, name, 0, winreg.REG_SZ, token)
+    return {"stored": True, "variable": name, "next": "Stored for your Windows account. No restart is needed for this helper."}
+
+
 def acquire_authorization(config: Config) -> str:
     if config.auth == "pat":
         token = read_environment(config.pat_env)
         if not token:
             raise AdoError(
-                f"Environment variable {config.pat_env} is empty. Set it to a "
-                "personal access token with Work Items (read & write) scope."
+                f"Environment variable {config.pat_env} is empty. Ask the user to run "
+                "`token-set` in their own terminal to store a personal access token."
             )
         return "Basic " + base64.b64encode(f":{token}".encode()).decode("ascii")
     resolved = find_azure_cli()
@@ -895,6 +926,65 @@ def connect(client: AdoClient) -> dict[str, Any]:
     }
 
 
+def inherit_process(client: AdoClient, *, name: str, dry_run: bool, wait_seconds: int = 60) -> dict[str, Any]:
+    """Move the project from a locked system process to an inherited copy.
+
+    Custom fields can only be added to an inherited process. The copy is new
+    and only this project is moved to it; other projects keep their process.
+    """
+    config = client.config
+    if not name.strip():
+        raise AdoError("The inherited process needs a name.")
+    project = client.request(
+        "GET", client._org(f"projects/{urllib.parse.quote(config.project)}"), query={"includeCapabilities": "true"}
+    )
+    template = (project.get("capabilities") or {}).get("processTemplate") or {}
+    current_id = template.get("templateTypeId")
+    current = client.request("GET", client._org(f"work/processes/{current_id}"))
+    if current.get("customizationType") == "inherited":
+        return {"process": current.get("name"), "dry_run": dry_run, "actions": []}
+    processes = client.request("GET", client._org("work/processes")).get("value", [])
+    existing = next((p for p in processes if p.get("name", "").casefold() == name.strip().casefold()), None)
+    if existing and existing.get("parentProcessTypeId") != current_id:
+        raise AdoError(f"A process named {name!r} exists but does not inherit from {current.get('name')}.")
+    actions = [] if existing else [f"create process {name.strip()} inheriting from {current.get('name')}"]
+    actions.append(f"move project {config.project} to process {name.strip()}")
+    if dry_run:
+        return {"process": name.strip(), "dry_run": True, "actions": actions}
+    if existing is None:
+        existing = client.request(
+            "POST",
+            client._org("work/processes"),
+            {"name": name.strip(), "parentProcessTypeId": current_id, "description": f"{current.get('name')} with the Etalii Spec Kit fields."},
+        )
+    try:
+        client.request(
+            "PATCH",
+            client._org(f"projects/{project['id']}"),
+            {"capabilities": {"processTemplate": {"templateTypeId": existing["typeId"]}}},
+        )
+    except AdoError as error:
+        # The process exists now; only the move is left, and a person can do it.
+        raise AdoError(
+            f"Process {name.strip()} is ready, but Azure DevOps did not accept moving the project to it ({error}). "
+            f"Move it by hand: Organization settings > Process > {current.get('name')} > Projects > "
+            f"{config.project} > Change process > {name.strip()}. Then run this again."
+        ) from error
+    # The move is queued on the server; wait until the project reports it.
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        project = client.request(
+            "GET", client._org(f"projects/{urllib.parse.quote(config.project)}"), query={"includeCapabilities": "true"}
+        )
+        moved = ((project.get("capabilities") or {}).get("processTemplate") or {}).get("templateTypeId") == existing["typeId"]
+        if moved or time.monotonic() >= deadline:
+            break
+        time.sleep(2)
+    if not moved:
+        raise AdoError(f"The move to process {name.strip()} was requested but has not completed yet. Run `connect` again shortly.")
+    return {"process": name.strip(), "dry_run": False, "actions": actions}
+
+
 def provision_fields(client: AdoClient, *, dry_run: bool) -> dict[str, Any]:
     """Create the custom fields and add them to the hierarchy's work item types.
 
@@ -913,7 +1003,7 @@ def provision_fields(client: AdoClient, *, dry_run: bool) -> dict[str, Any]:
     if process.get("customizationType") != "inherited":
         raise AdoError(
             f"Project {config.project} uses the {process.get('name')} process, which is not an inherited "
-            "process. Create an inherited process, move the project to it, and run this again."
+            "process. Run `process-inherit --name <name>` to create one and move the project to it."
         )
     actions: list[str] = []
     for reference, name, field_type, labels, _ in FIELD_DEFINITIONS:
@@ -1111,7 +1201,11 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--hierarchy", default=DEFAULT_HIERARCHY)
 
     commands.add_parser("config-show", help="Print the configuration")
+    commands.add_parser("token-set", help="Store the personal access token (run by the user, in a terminal)")
     commands.add_parser("connect", help="Verify the connection, hierarchy and custom fields")
+    inherit = commands.add_parser("process-inherit", help="Move the project to a new inherited process")
+    inherit.add_argument("--name", required=True)
+    inherit.add_argument("--dry-run", action="store_true")
     fields = commands.add_parser("fields-provision", help="Create the custom fields on the inherited process")
     fields.add_argument("--dry-run", action="store_true")
 
@@ -1181,9 +1275,15 @@ def run(args: argparse.Namespace, client_factory: Callable[[Config], AdoClient] 
     config = load_config(config_path)
     if args.command == "config-show":
         return {"config": str(config_path), **config.values}
+    if args.command == "token-set":
+        import getpass
+
+        return store_token(config.pat_env, interactive=sys.stdin.isatty(), prompt=getpass.getpass)
     client = client_factory(config)
     if args.command == "connect":
         return connect(client)
+    if args.command == "process-inherit":
+        return inherit_process(client, name=args.name, dry_run=args.dry_run)
     if args.command == "fields-provision":
         return provision_fields(client, dry_run=args.dry_run)
     if args.command == "item-get":

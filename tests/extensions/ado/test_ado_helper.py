@@ -87,11 +87,49 @@ class TestConfig:
 
     def test_pat_is_read_from_the_environment_only(self, monkeypatch):
         config = make_config()
-        monkeypatch.delenv(config.pat_env, raising=False)
+        monkeypatch.setattr(ado, "read_environment", lambda name: "")
         with pytest.raises(ado.AdoError, match=config.pat_env):
             ado.acquire_authorization(config)
-        monkeypatch.setenv(config.pat_env, "secret")
+        monkeypatch.setattr(ado, "read_environment", lambda name: "secret" if name == config.pat_env else "")
         assert ado.acquire_authorization(config) == "Basic OnNlY3JldA=="
+
+    def test_process_environment_wins_and_is_trimmed(self, monkeypatch):
+        monkeypatch.setenv("ETALII_TEST_TOKEN", "  from-process ")
+        assert ado.read_environment("ETALII_TEST_TOKEN") == "from-process"
+
+    def test_unset_variable_is_empty_off_windows(self, monkeypatch):
+        monkeypatch.delenv("ETALII_TEST_TOKEN", raising=False)
+        monkeypatch.setattr(ado.sys, "platform", "linux")
+        assert ado.read_environment("ETALII_TEST_TOKEN") == ""
+
+    def test_windows_falls_back_to_the_stored_user_environment(self, monkeypatch):
+        class Key:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        class FakeWinreg:
+            HKEY_CURRENT_USER = object()
+
+            @staticmethod
+            def OpenKey(root, name):
+                assert name == "Environment"
+                return Key()
+
+            @staticmethod
+            def QueryValueEx(key, name):
+                if name == "ETALII_TEST_TOKEN":
+                    return " stored ", 1
+                raise OSError("not found")
+
+        monkeypatch.delenv("ETALII_TEST_TOKEN", raising=False)
+        monkeypatch.delenv("ETALII_TEST_MISSING", raising=False)
+        monkeypatch.setattr(ado.sys, "platform", "win32")
+        monkeypatch.setitem(sys.modules, "winreg", FakeWinreg)
+        assert ado.read_environment("ETALII_TEST_TOKEN") == "stored"
+        assert ado.read_environment("ETALII_TEST_MISSING") == ""
 
 
 class TestAzureCliLookup:
@@ -123,6 +161,64 @@ class TestAzureCliLookup:
         monkeypatch.setenv("ProgramFiles", str(tmp_path))
         monkeypatch.delenv("ProgramFiles(x86)", raising=False)
         assert ado.find_azure_cli() is None
+
+
+class TestStoreToken:
+    def test_refuses_to_run_without_a_terminal(self):
+        asked = []
+        with pytest.raises(ado.AdoError, match="by the user in their own terminal"):
+            ado.store_token("ETALII_TEST_TOKEN", interactive=False, prompt=asked.append)
+        assert asked == []
+
+    def test_empty_input_stores_nothing(self):
+        with pytest.raises(ado.AdoError, match="nothing was stored"):
+            ado.store_token("ETALII_TEST_TOKEN", interactive=True, prompt=lambda text: "  ")
+
+    def test_off_windows_it_explains_instead_of_editing_profiles(self, monkeypatch):
+        monkeypatch.setattr(ado.sys, "platform", "linux")
+        result = ado.store_token("ETALII_TEST_TOKEN", interactive=True, prompt=lambda text: "tok3n-xyz")
+        assert result["stored"] is False and "export ETALII_TEST_TOKEN=" in result["next"]
+        assert "tok3n-xyz" not in json.dumps(result)
+
+    def test_windows_stores_it_in_the_user_environment(self, monkeypatch):
+        written = {}
+
+        class Key:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        class FakeWinreg:
+            HKEY_CURRENT_USER, KEY_SET_VALUE, REG_SZ = object(), 2, 1
+
+            @staticmethod
+            def OpenKey(root, name, reserved, access):
+                assert (name, access) == ("Environment", 2)
+                return Key()
+
+            @staticmethod
+            def SetValueEx(key, name, reserved, kind, value):
+                written[name] = value
+
+        monkeypatch.setattr(ado.sys, "platform", "win32")
+        monkeypatch.setitem(sys.modules, "winreg", FakeWinreg)
+        result = ado.store_token("ETALII_TEST_TOKEN", interactive=True, prompt=lambda text: " tok3n-xyz ")
+        assert written == {"ETALII_TEST_TOKEN": "tok3n-xyz"}
+        assert result["stored"] is True and "tok3n-xyz" not in json.dumps(result)
+
+    def test_cli_refuses_when_stdin_is_not_a_terminal(self, tmp_path, monkeypatch):
+        path = tmp_path / "ado-config.yml"
+        path.write_text(ado.render_flat_yaml({"organization_url": ORG, "project": "Shop", "auth": "pat"}), encoding="utf-8")
+
+        class NoTerminal:
+            def isatty(self):
+                return False
+
+        monkeypatch.setattr(ado.sys, "stdin", NoTerminal())
+        with pytest.raises(ado.AdoError, match="own terminal"):
+            ado.run(ado.build_parser().parse_args(["--config", str(path), "token-set"]))
 
 
 class TestLabels:
@@ -523,6 +619,54 @@ class TestSetup:
     def test_server_errors_carry_the_message(self, fake, client):
         with pytest.raises(ado.AdoError, match="HTTP 404: Work item does not exist"):
             client.get_item(1)
+
+
+class TestInheritProcess:
+    @pytest.fixture
+    def system(self):
+        fake = FakeAdo(customization="system")
+        return fake, ado.AdoClient(make_config(), transport=fake, authorization="Basic test")
+
+    def test_dry_run_plans_without_writing(self, system):
+        fake, client = system
+        result = ado.inherit_process(client, name="Etalii Agile", dry_run=True)
+        assert result["actions"] == [
+            "create process Etalii Agile inheriting from Shop Agile",
+            "move project Shop to process Etalii Agile",
+        ]
+        assert fake.writes() == []
+
+    def test_creates_the_process_and_moves_only_this_project(self, system):
+        fake, client = system
+        ado.inherit_process(client, name="Etalii Agile", dry_run=False, wait_seconds=0)
+        assert fake.project_process == "p2"
+        assert fake.processes[-1]["parentProcessTypeId"] == "p1"
+        assert [call for call in fake.writes()] == [
+            ("POST", "/contoso/_apis/work/processes"),
+            ("PATCH", "/contoso/_apis/projects/shop-id"),
+        ]
+
+    def test_project_already_on_an_inherited_process_is_left_alone(self, fake, client):
+        assert ado.inherit_process(client, name="Etalii Agile", dry_run=False)["actions"] == []
+        assert fake.writes() == []
+
+    def test_refused_move_says_how_to_do_it_by_hand(self, system):
+        fake, client = system
+        fake.refuse_project_move = True
+        with pytest.raises(ado.AdoError, match="Change process > Etalii Agile"):
+            ado.inherit_process(client, name="Etalii Agile", dry_run=False, wait_seconds=0)
+        assert fake.project_process == "p1"
+
+    def test_existing_process_with_another_parent_is_refused(self, system):
+        fake, client = system
+        fake.processes.append({"name": "Etalii Agile", "typeId": "p9", "parentProcessTypeId": "other"})
+        with pytest.raises(ado.AdoError, match="does not inherit from Shop Agile"):
+            ado.inherit_process(client, name="etalii agile", dry_run=False)
+        assert fake.writes() == []
+
+    def test_name_is_required(self, system):
+        with pytest.raises(ado.AdoError, match="needs a name"):
+            ado.inherit_process(system[1], name=" ", dry_run=True)
 
 
 class TestBoardSymbols:

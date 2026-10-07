@@ -22,15 +22,21 @@ URL, the project, how to sign in and the hierarchy, writes
 `.specify/extensions/ado/ado-config.yml`, verifies the connection, and offers
 to provision the custom fields.
 
-Sign-in is either the Azure CLI (`az login`) or a personal access token read
-from an environment variable (default `AZURE_DEVOPS_EXT_PAT`). The token is
-never written to disk and the setup command never asks for it. It needs
-*Work Items (read & write)*, plus *Process (read & write)* for provisioning.
+Sign-in is either the Azure CLI (`az login`) or a personal access token.
 
-Provisioning changes the project's **inherited process**. A project that is
-still on a system process (Agile, Scrum, Basic or CMMI as shipped) has to be
-moved to an inherited process first; on-premises XML processes are not
-supported.
+- **Azure CLI** works when the organization is connected to the Microsoft Entra
+  directory you sign in to. An organization owned by a personal Microsoft
+  account usually is not, and then refuses the sign-in; use a token there.
+- **Token**: setup gives you a `token-set` command to run in your own terminal.
+  It asks for the token with hidden input and stores it in your user
+  environment (default variable `AZURE_DEVOPS_EXT_PAT`). The token is never
+  written to the project and the agent never sees it. It needs *Work Items:
+  Read, write & manage* and *Project and Team: Read*.
+
+Custom fields need an **inherited process**. When the project is still on a
+system process (Agile, Scrum, Basic or CMMI as shipped), setup offers to create
+an inherited copy and move only this project to it. On-premises XML processes
+are not supported.
 
 ## Fields
 

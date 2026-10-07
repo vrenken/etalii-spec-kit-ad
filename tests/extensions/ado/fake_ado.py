@@ -39,6 +39,9 @@ class FakeAdo:
             for name in ("Epic", "Feature", "User Story", "Task")
         }
         self.status_override: int | None = None
+        self.project_process = "p1"
+        self.refuse_project_move = False
+        self.processes: list[dict[str, Any]] = [{"name": "Shop Agile", "typeId": "p1", "customizationType": customization}]
         self._next_id = 100
 
     # -- test helpers ---------------------------------------------------------
@@ -124,7 +127,20 @@ class FakeAdo:
             field = re.search(r"\[(Custom\.[A-Za-z]+)\] <> ''", payload["query"]).group(1)
             return 200, {"workItems": [{"id": i} for i, item in sorted(self.items.items()) if item["fields"].get(field)]}
         if path == "/contoso/_apis/projects/Shop":
-            return 200, {"name": "Shop", "capabilities": {"processTemplate": {"templateName": "Shop Agile", "templateTypeId": "p1"}}}
+            return 200, {"id": "shop-id", "name": "Shop", "capabilities": {"processTemplate": {"templateName": "Shop Agile", "templateTypeId": self.project_process}}}
+        if path == "/contoso/_apis/projects/shop-id" and method == "PATCH":
+            if self.refuse_project_move:
+                return 400, {"message": "The project update is invalid."}
+            self.project_process = payload["capabilities"]["processTemplate"]["templateTypeId"]
+            return 200, {"status": "queued"}
+        if path == "/contoso/_apis/work/processes":
+            if method == "POST":
+                created = {"name": payload["name"], "typeId": "p2", "customizationType": "inherited", "parentProcessTypeId": payload["parentProcessTypeId"]}
+                self.processes.append(created)
+                return 200, created
+            return 200, {"value": self.processes}
+        if path == "/contoso/_apis/work/processes/p2":
+            return 200, {"name": "Etalii Agile", "customizationType": "inherited"}
         if path == "/contoso/Shop/_apis/wit/workitemtypes":
             return 200, {"value": list(self.types.values())}
         if path == "/contoso/_apis/wit/fields":
