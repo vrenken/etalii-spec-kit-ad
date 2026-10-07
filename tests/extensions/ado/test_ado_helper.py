@@ -94,6 +94,37 @@ class TestConfig:
         assert ado.acquire_authorization(config) == "Basic OnNlY3JldA=="
 
 
+class TestAzureCliLookup:
+    def test_falls_back_to_the_default_install_folder_when_path_is_stale(self, tmp_path, monkeypatch):
+        cli = tmp_path / "Microsoft SDKs" / "Azure" / "CLI2" / "wbin" / "az.cmd"
+        cli.parent.mkdir(parents=True)
+        cli.write_text("", encoding="utf-8")
+        monkeypatch.setattr(ado.shutil, "which", lambda name: None)
+        monkeypatch.setenv("ProgramFiles", str(tmp_path))
+        monkeypatch.delenv("ProgramFiles(x86)", raising=False)
+        assert ado.find_azure_cli() == str(cli)
+
+    def test_prefers_the_cli_on_path(self, tmp_path, monkeypatch):
+        on_path = str(tmp_path / "az")
+        monkeypatch.setattr(ado.shutil, "which", lambda name: on_path)
+        assert ado.find_azure_cli() == on_path
+
+    def test_missing_cli_is_reported(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(ado.shutil, "which", lambda name: None)
+        monkeypatch.setenv("ProgramFiles", str(tmp_path))
+        monkeypatch.delenv("ProgramFiles(x86)", raising=False)
+        assert ado.find_azure_cli() is None
+        config = ado.Config({"organization_url": ORG, "project": "Shop", "auth": "azure-cli"})
+        with pytest.raises(ado.AdoError, match="was not found"):
+            ado.acquire_authorization(config)
+
+    def test_relative_path_hit_is_not_trusted(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(ado.shutil, "which", lambda name: "az.cmd")
+        monkeypatch.setenv("ProgramFiles", str(tmp_path))
+        monkeypatch.delenv("ProgramFiles(x86)", raising=False)
+        assert ado.find_azure_cli() is None
+
+
 class TestLabels:
     @pytest.mark.parametrize("stored", ["Agent", "agent", "\U0001F916 Agent", "  \u2699  AGENT"])
     def test_canonical_ignores_a_leading_glyph(self, stored: str):
@@ -457,11 +488,37 @@ class TestSetup:
             ado.provision_fields(client, dry_run=False)
         assert fake.writes() == []
 
-    @pytest.mark.parametrize("status", [401, 403, 203])
+    @pytest.mark.parametrize("status", [401, 203])
     def test_rejected_credentials_are_reported(self, fake, client, status):
         fake.status_override = status
         with pytest.raises(ado.AdoError, match="rejected the credentials"):
             client.get_item(1)
+
+    def test_a_refusal_carries_the_server_message(self, fake, client):
+        fake.status_override = 403
+        with pytest.raises(ado.AdoError, match="HTTP 403.: forced failure"):
+            client.get_item(1)
+
+    def test_an_account_unknown_to_the_organization_gets_a_way_out(self):
+        text = ado.explain_refusal("Identity 0b03 has not been materialized, please use interactive login")
+        assert "not a member of this organization" in text and "'pat'" in text
+        assert "required permissions" in ado.explain_refusal(None)
+
+    def test_error_bodies_with_a_byte_order_mark_are_parsed(self, monkeypatch):
+        class Response:
+            status = 200
+
+            def read(self):
+                return bytes([0xEF, 0xBB, 0xBF]) + b'{"message": "hello"}'
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        monkeypatch.setattr(ado.urllib.request, "urlopen", lambda request, timeout: Response())
+        assert ado.urllib_transport("GET", "https://example.invalid/x", {}, None) == (200, {"message": "hello"})
 
     def test_server_errors_carry_the_message(self, fake, client):
         with pytest.raises(ado.AdoError, match="HTTP 404: Work item does not exist"):

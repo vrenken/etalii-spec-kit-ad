@@ -232,17 +232,57 @@ def load_config(path: Path) -> Config:
 # -- HTTP ---------------------------------------------------------------------
 
 
+def find_azure_cli() -> str | None:
+    """Locate the Azure CLI, also right after it was installed.
+
+    On Windows the installer adds ``az`` to PATH for new processes only, so a
+    terminal or agent session that was already open does not see it. The
+    default install folders are checked as a fallback so that a fresh install
+    works without restarting anything.
+    """
+    resolved = shutil.which("az")
+    if resolved and os.path.isabs(resolved):
+        return resolved
+    for variable in ("ProgramFiles", "ProgramFiles(x86)"):
+        root = os.environ.get(variable)
+        if root:
+            candidate = Path(root) / "Microsoft SDKs" / "Azure" / "CLI2" / "wbin" / "az.cmd"
+            if candidate.is_file():
+                return str(candidate)
+    return None
+
+
+def read_environment(name: str) -> str:
+    """Read an environment variable, also right after the user set it.
+
+    On Windows a variable set for the user reaches new processes only, so a
+    session that was already open still has the old environment. The user's
+    stored environment is consulted as a fallback.
+    """
+    value = os.environ.get(name, "").strip()
+    if value or sys.platform != "win32":
+        return value
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+            stored, _ = winreg.QueryValueEx(key, name)
+    except (ImportError, OSError):
+        return ""
+    return stored.strip() if isinstance(stored, str) else ""
+
+
 def acquire_authorization(config: Config) -> str:
     if config.auth == "pat":
-        token = os.environ.get(config.pat_env, "").strip()
+        token = read_environment(config.pat_env)
         if not token:
             raise AdoError(
                 f"Environment variable {config.pat_env} is empty. Set it to a "
                 "personal access token with Work Items (read & write) scope."
             )
         return "Basic " + base64.b64encode(f":{token}".encode()).decode("ascii")
-    resolved = shutil.which("az")
-    if not resolved or not os.path.isabs(resolved):
+    resolved = find_azure_cli()
+    if not resolved:
         raise AdoError("Azure CLI (az) was not found. Install it or switch auth to 'pat'.")
     try:
         result = subprocess.run(
@@ -270,10 +310,24 @@ def urllib_transport(method: str, url: str, headers: dict[str, str], body: bytes
     except urllib.error.URLError as error:
         raise AdoError(f"Could not reach Azure DevOps: {error.reason}") from error
     try:
-        return status, json.loads(raw.decode("utf-8")) if raw else None
+        # Azure DevOps prefixes some error bodies with a byte order mark.
+        return status, json.loads(raw.decode("utf-8-sig")) if raw else None
     except ValueError:
         # A sign-in page instead of JSON means the credentials were rejected.
         return status, {"message": raw[:200].decode("utf-8", "replace")}
+
+
+def explain_refusal(message: str | None) -> str:
+    """Turn a 403 into something the user can act on."""
+    if message and "has not been materialized" in message:
+        return (
+            "the signed-in Azure CLI account is not a member of this organization. "
+            "This happens when the organization is not connected to the Microsoft Entra "
+            "directory the Azure CLI signed in to, which is the usual case for an "
+            "organization owned by a personal Microsoft account. Use auth 'pat' instead, "
+            "or connect the organization to that directory."
+        )
+    return message or "no details. Check that the account or token has the required permissions."
 
 
 class AdoClient:
@@ -315,10 +369,12 @@ class AdoClient:
             headers["Content-Type"] = "application/json-patch+json" if patch else "application/json"
             data = json.dumps(body).encode("utf-8")
         status, payload = self._transport(method, full_url, headers, data)
-        if status in (401, 403) or status == 203:
+        message = payload.get("message") if isinstance(payload, dict) else None
+        if status in (401, 203):
             raise AdoError(f"Azure DevOps rejected the credentials (HTTP {status}).")
+        if status == 403:
+            raise AdoError(f"Azure DevOps refused the request (HTTP 403): {explain_refusal(message)}")
         if status >= 400:
-            message = payload.get("message") if isinstance(payload, dict) else None
             raise AdoError(f"Azure DevOps returned HTTP {status}: {message or 'no details'}")
         return payload
 
