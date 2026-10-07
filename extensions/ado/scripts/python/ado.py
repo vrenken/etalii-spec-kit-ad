@@ -48,13 +48,15 @@ DEFAULT_PAT_ENV = "AZURE_DEVOPS_EXT_PAT"
 # Canonical key -> value stored in Azure DevOps. Reading is tolerant of a
 # leading glyph (see ``canonical``), so the stored labels can gain symbols
 # without breaking items written earlier.
-ASK_LABELS = {"human": "Human", "agent": "Agent"}
+# The glyph is part of the stored value so that it shows wherever the field
+# does: backlog columns, board cards, queries and delivery plans.
+ASK_LABELS = {"human": "\U0001F464 Human", "agent": "\U0001F916 Agent"}
 SPEC_STATE_LABELS = {
-    "open": "Open",
-    "ready-for-review": "Ready for review by user",
-    "approved": "Approved by user",
-    "requires-finetuning": "Requires finetuning by agent",
-    "worked-on": "Worked on by agent",
+    "open": "\u25CB Open",
+    "ready-for-review": "\U0001F441 Ready for review by user",
+    "approved": "\u2705 Approved by user",
+    "requires-finetuning": "\u21BB Requires finetuning by agent",
+    "worked-on": "\u2699 Worked on by agent",
 }
 REQUEST_LABELS = {
     "describe": "Describe",
@@ -119,14 +121,18 @@ def canonical(value: object, labels: dict[str, str]) -> str | None:
     """
     if not isinstance(value, str):
         return None
-    text = value.strip()
-    while text and not text[0].isalnum():
-        text = text[1:]
-    text = text.strip().casefold()
+    text = _without_glyph(value)
     for key, label in labels.items():
-        if text in (key.casefold(), label.casefold()):
+        if text in (key.casefold(), _without_glyph(label)):
             return key
     return None
+
+
+def _without_glyph(text: str) -> str:
+    text = text.strip()
+    while text and not text[0].isalnum():
+        text = text[1:]
+    return text.strip().casefold()
 
 
 # -- Configuration ------------------------------------------------------------
@@ -959,6 +965,60 @@ def _provision_layout(
     return actions
 
 
+# -- Board symbols ------------------------------------------------------------
+
+# Card tints, first match wins: an item waiting on a person outranks the
+# agent tint, so "needs you" is never hidden behind "an agent owns this".
+CARD_RULES = [
+    ("Etalii: waiting on a person", f"[{F_SPEC_STATE}] = '{SPEC_STATE_LABELS['ready-for-review']}'", "#FFF8DF"),
+    ("Etalii: agent-owned", f"[{F_ASK}] = '{ASK_LABELS['agent']}'", "#F4ECFB"),
+]
+CARD_FIELDS = [F_ASK, F_SPEC_STATE]
+
+
+def style_boards(client: AdoClient, *, dry_run: bool) -> dict[str, Any]:
+    """Show ownership on the team's boards: two card fields and two tints.
+
+    Existing card rules and card fields are kept. Our own rules are replaced
+    in place and put first, so re-running is safe.
+    """
+    config = client.config
+    scope = urllib.parse.quote(config.project) + (f"/{urllib.parse.quote(config.team)}" if config.team else "")
+    base = f"{config.organization_url}/{scope}/_apis/work/boards"
+    actions: list[str] = []
+    for board in client.request("GET", base).get("value", []):
+        name = board["name"]
+        board_url = f"{base}/{urllib.parse.quote(name)}"
+
+        rules = client.request("GET", f"{board_url}/cardrulesettings").get("rules") or {}
+        ours = [
+            {"name": rule, "isEnabled": "true", "filter": query, "settings": {"background-color": color, "title-color": "#000000"}}
+            for rule, query, color in CARD_RULES
+        ]
+        fill = rules.get("fill") or []
+        merged = ours + [r for r in fill if r.get("name") not in {rule[0] for rule in CARD_RULES}]
+        if merged != fill:
+            actions.append(f"set card tints on board {name}")
+            if not dry_run:
+                client.request("PATCH", f"{board_url}/cardrulesettings", {"rules": {**rules, "fill": merged}})
+
+        cards = client.request("GET", f"{board_url}/cardsettings").get("cards") or {}
+        changed = False
+        for type_name, shown in cards.items():
+            if config.level_of(type_name) is None:
+                continue
+            present = {field.get("fieldIdentifier") for field in shown}
+            missing = [f for f in CARD_FIELDS if f not in present]
+            if missing:
+                shown.extend({"fieldIdentifier": f} for f in missing)
+                changed = True
+        if changed:
+            actions.append(f"show Ask and Specification State on {name} cards")
+            if not dry_run:
+                client.request("PUT", f"{board_url}/cardsettings", {"cards": cards})
+    return {"dry_run": dry_run, "actions": actions}
+
+
 def config_init(path: Path, args: argparse.Namespace) -> dict[str, Any]:
     values = {
         "organization_url": args.organization_url.strip().rstrip("/"),
@@ -1053,6 +1113,8 @@ def build_parser() -> argparse.ArgumentParser:
     handover_parser.add_argument("--note", required=True)
 
     commands.add_parser("requests", help="List agent requests raised from Azure DevOps")
+    boards = commands.add_parser("boards-style", help="Show human and agent ownership on the team boards")
+    boards.add_argument("--dry-run", action="store_true")
     return parser
 
 
@@ -1121,6 +1183,8 @@ def run(args: argparse.Namespace, client_factory: Callable[[Config], AdoClient] 
         return progress(client, args.id, owner=args.owner, status=args.status, note=args.note)
     if args.command == "handover":
         return handover(client, args.id, owner=args.owner, to=args.to, note=args.note)
+    if args.command == "boards-style":
+        return style_boards(client, dry_run=args.dry_run)
     if args.command == "requests":
         project = config.project.replace("'", "''")
         ids = client.query_ids(

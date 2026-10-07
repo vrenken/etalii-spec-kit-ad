@@ -36,8 +36,8 @@ supported.
 
 | Field | On | Values |
 |---|---|---|
-| Etalii Ask | every level | Human, Agent |
-| Etalii Specification State | every level | Open, Ready for review by user, Approved by user, Requires finetuning by agent, Worked on by agent |
+| Etalii Ask | every level | 👤 Human, 🤖 Agent |
+| Etalii Specification State | every level | ○ Open, 👁 Ready for review by user, ✅ Approved by user, ↻ Requires finetuning by agent, ⚙ Worked on by agent |
 | Etalii Specification | every level | markdown |
 | Etalii Agent Request | every level | Describe, Subdivide, Decompose, Plan, Regenerate, Refine, Analyse |
 | Etalii Agent Request Notes | every level | free text |
@@ -50,6 +50,18 @@ supported.
 The implementation fields exist so that work can be resumed when an agent
 thread ends: they say who had the task, in which tool, on which system, and on
 which branch and worktree.
+
+## Seeing who owns what
+
+The glyph is part of the stored value, so ownership reads the same in the
+backlog, on board cards, in queries and in delivery plans.
+
+- **Boards**: `/speckit.ado.setup` offers to style the team boards. Cards show
+  the Ask and Specification State; agent-owned cards are tinted violet and
+  cards waiting on a person amber. Existing card rules are kept.
+- **Backlog**: add the *Etalii Ask* and *Etalii Specification State* columns
+  through **Column options**. Azure DevOps stores backlog columns per person,
+  so this cannot be done for the team.
 
 ## Commands
 

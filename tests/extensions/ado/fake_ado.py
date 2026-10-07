@@ -27,6 +27,12 @@ class FakeAdo:
         self.type_fields: dict[str, set[str]] = {}
         self.picklists: list[dict[str, Any]] = []
         self.layouts: dict[str, list[dict[str, Any]]] = {}
+        self.boards: dict[str, dict[str, Any]] = {
+            "Stories": {
+                "rules": {"fill": [{"name": "Blocked", "isEnabled": "true", "filter": "[System.Tags] contains 'Blocked'", "settings": {"background-color": "#F8D7DA"}}], "tagStyle": [{"name": "Blocked"}]},
+                "cards": {"User Story": [{"fieldIdentifier": "System.Title"}], "Bug": [{"fieldIdentifier": "System.Title"}]},
+            }
+        }
         self.customization = customization
         self.types = {
             name: {"name": name, "referenceName": f"Microsoft.VSTS.WorkItemTypes.{name.replace(' ', '')}", "customization": "system"}
@@ -144,6 +150,16 @@ class FakeAdo:
                 fields.add(payload["referenceName"])
                 return 200, payload
             return 200, {"value": [{"referenceName": name} for name in sorted(fields)]}
+        if path == "/contoso/Shop/_apis/work/boards":
+            return 200, {"value": [{"name": name} for name in self.boards]}
+        match = re.fullmatch(r"/contoso/Shop/_apis/work/boards/([^/]+)/(cardrulesettings|cardsettings)", path)
+        if match:
+            board = self.boards[match.group(1)]
+            key = "rules" if match.group(2) == "cardrulesettings" else "cards"
+            if method != "GET":
+                assert method == ("PATCH" if key == "rules" else "PUT")
+                board[key] = payload[key]
+            return 200, {key: json.loads(json.dumps(board[key]))}
         layout = r"/contoso/_apis/work/processes/p1/workitemtypes/([^/]+)/layout"
         match = re.fullmatch(layout, path)
         if match:

@@ -91,7 +91,7 @@ test("a request stores the action and trimmed notes", () => {
 test("only refine sends the specification back to the agent", () => {
   const states = (action: Parameters<typeof requestPatch>[0]) =>
     requestPatch(action, "").filter((operation) => operation.path.endsWith("EtaliiSpecificationState"));
-  assert.deepEqual(states("refine").map((operation) => operation.value), ["Requires finetuning by agent"]);
+  assert.deepEqual(states("refine").map((operation) => operation.value), ["↻ Requires finetuning by agent"]);
   for (const action of ["describe", "subdivide", "decompose", "plan", "regenerate", "analyse"] as const) {
     assert.deepEqual(states(action), []);
   }

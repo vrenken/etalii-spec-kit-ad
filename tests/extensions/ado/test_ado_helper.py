@@ -111,12 +111,12 @@ class TestSpecificationState:
     def test_agent_item_goes_through_worked_on_to_ready_for_review(self, fake, client):
         item = fake.add("Feature", "Invoices", **{ado.F_ASK: "Agent", ado.F_SPEC_STATE: "Open"})
         assert ado.spec_begin(client, item, requested_by_user=False, takeover=False)["previous"] == "open"
-        assert fields(fake, item)[ado.F_SPEC_STATE] == "Worked on by agent"
+        assert fields(fake, item)[ado.F_SPEC_STATE] == "⚙ Worked on by agent"
         ado.spec_write(client, item, "## Goal\nDownload invoices.")
         assert fields(fake, item)[ado.F_SPEC] == "## Goal\nDownload invoices."
         assert fake.items[item]["multilineFieldsFormat"] == {ado.F_SPEC: "Markdown"}
         ado.spec_finish(client, item)
-        assert fields(fake, item)[ado.F_SPEC_STATE] == "Ready for review by user"
+        assert fields(fake, item)[ado.F_SPEC_STATE] == "👁 Ready for review by user"
 
     def test_specification_never_lands_in_the_description(self, fake, client):
         item = fake.add("Feature", "Invoices", **{ado.F_ASK: "Agent"})
@@ -141,7 +141,7 @@ class TestSpecificationState:
         extra = {ado.F_REQUEST: "Refine", ado.F_REQUEST_NOTES: "shorter"} if invitation == "request" else {}
         item = fake.add("Epic", "Portal", **{ado.F_ASK: "Human", ado.F_SPEC_STATE: "Approved by user"}, **extra)
         ado.spec_begin(client, item, requested_by_user=invitation == "flag", takeover=False)
-        assert fields(fake, item)[ado.F_SPEC_STATE] == "Worked on by agent"
+        assert fields(fake, item)[ado.F_SPEC_STATE] == "⚙ Worked on by agent"
 
     def test_finish_clears_the_pending_request(self, fake, client):
         item = fake.add("Epic", "Portal", **{ado.F_ASK: "Human", ado.F_REQUEST: "Refine", ado.F_REQUEST_NOTES: "shorter"})
@@ -218,8 +218,8 @@ class TestApplyPlan:
         assert ado.summarize(fake.items[ui])["parent"] == story
         assert ado.summarize(fake.items[ui])["predecessors"] == [api]
         assert ado.summarize(fake.items[api])["successors"] == [ui]
-        assert fields(fake, ui)[ado.F_ASK] == "Human" and fields(fake, api)[ado.F_ASK] == "Agent"
-        assert fields(fake, api)[ado.F_SPEC_STATE] == "Ready for review by user"
+        assert fields(fake, ui)[ado.F_ASK] == "👤 Human" and fields(fake, api)[ado.F_ASK] == "🤖 Agent"
+        assert fields(fake, api)[ado.F_SPEC_STATE] == "👁 Ready for review by user"
         assert fields(fake, api)[ado.F_SPEC] == "## Objective\nDo it."
         assert fake.items[api]["multilineFieldsFormat"] == {ado.F_SPEC: "Markdown"}
         assert fields(fake, api)["System.AreaPath"] == "Shop\\Web"
@@ -434,7 +434,7 @@ class TestSetup:
         ado.provision_fields(client, dry_run=False)
         assert {d[0] for d in ado.FIELD_DEFINITIONS} <= fake.fields
         assert [p["items"] for p in fake.picklists if p["name"] == "Custom.EtaliiSpecificationState.Values"] == [
-            ["Open", "Ready for review by user", "Approved by user", "Requires finetuning by agent", "Worked on by agent"]
+            ["○ Open", "👁 Ready for review by user", "✅ Approved by user", "↻ Requires finetuning by agent", "⚙ Worked on by agent"]
         ]
         assert ado.F_SPEC in fake.type_fields["ShopAgile.Epic"]
         assert ado.F_IMPL_OWNER not in fake.type_fields["ShopAgile.Epic"]
@@ -466,6 +466,41 @@ class TestSetup:
     def test_server_errors_carry_the_message(self, fake, client):
         with pytest.raises(ado.AdoError, match="HTTP 404: Work item does not exist"):
             client.get_item(1)
+
+
+class TestBoardSymbols:
+    def test_stored_values_carry_the_glyph(self):
+        assert ado.ASK_LABELS == {"human": "\U0001F464 Human", "agent": "\U0001F916 Agent"}
+        for key, label in ado.SPEC_STATE_LABELS.items():
+            assert not label[0].isalnum() and ado.canonical(label, ado.SPEC_STATE_LABELS) == key
+
+    def test_dry_run_plans_without_writing(self, fake, client):
+        result = ado.style_boards(client, dry_run=True)
+        assert result["actions"] == [
+            "set card tints on board Stories",
+            "show Ask and Specification State on Stories cards",
+        ]
+        assert fake.writes() == []
+
+    def test_tints_come_first_and_existing_rules_survive(self, fake, client):
+        ado.style_boards(client, dry_run=False)
+        rules = fake.boards["Stories"]["rules"]
+        assert [r["name"] for r in rules["fill"]] == ["Etalii: waiting on a person", "Etalii: agent-owned", "Blocked"]
+        assert rules["fill"][0]["filter"] == "[Custom.EtaliiSpecificationState] = '\U0001F441 Ready for review by user'"
+        assert rules["fill"][1]["filter"] == "[Custom.EtaliiAsk] = '\U0001F916 Agent'"
+        assert rules["tagStyle"] == [{"name": "Blocked"}]
+
+    def test_card_fields_are_added_only_to_hierarchy_types(self, fake, client):
+        ado.style_boards(client, dry_run=False)
+        cards = fake.boards["Stories"]["cards"]
+        assert [f["fieldIdentifier"] for f in cards["User Story"]] == ["System.Title", ado.F_ASK, ado.F_SPEC_STATE]
+        assert cards["Bug"] == [{"fieldIdentifier": "System.Title"}]
+
+    def test_second_run_changes_nothing(self, fake, client):
+        ado.style_boards(client, dry_run=False)
+        before = len(fake.writes())
+        assert ado.style_boards(client, dry_run=False)["actions"] == []
+        assert len(fake.writes()) == before
 
 
 class TestCli:

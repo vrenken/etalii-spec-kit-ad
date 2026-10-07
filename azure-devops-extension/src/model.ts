@@ -10,7 +10,7 @@ export const FIELDS = {
   agentRequestNotes: "Custom.EtaliiAgentRequestNotes",
 } as const;
 
-export const REQUIRES_FINETUNING = "Requires finetuning by agent";
+export const REQUIRES_FINETUNING = "↻ Requires finetuning by agent";
 
 export type Action =
   | "describe"
