@@ -3,6 +3,21 @@
   "updated_at": "2026-09-28T16:20:28Z",
   "catalog_url": "https://raw.githubusercontent.com/github/spec-kit/main/extensions/catalog.json",
   "extensions": {
+    "ado": {
+      "name": "Azure DevOps Work Items",
+      "id": "ado",
+      "version": "0.1.0",
+      "description": "etalii-spec-kit-ad: keep specifications in Azure DevOps work items so agents and a human team share one backlog",
+      "author": "etalii",
+      "repository": "https://github.com/vrenken/etalii-spec-kit-ad",
+      "bundled": true,
+      "tags": [
+        "azure-devops",
+        "work-items",
+        "team",
+        "integration"
+      ]
+    },
     "agent-context": {
       "name": "Coding Agent Context",
       "id": "agent-context",
