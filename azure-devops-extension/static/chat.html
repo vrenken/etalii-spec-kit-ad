@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Etalii Spec Kit chat</title>
+    <style>
+      /*
+        Azure DevOps hands its theme to the frame as CSS variables. Palette
+        variables are "r, g, b" triplets, so they are wrapped in rgba(); the
+        fallbacks are the light theme values.
+      */
+      :root {
+        --bg: var(--callout-background-color, var(--background-color, #ffffff));
+        --field: var(--background-color, #ffffff);
+        --fg: var(--text-primary-color, rgba(0, 0, 0, 0.9));
+        --muted: var(--text-secondary-color, rgba(0, 0, 0, 0.55));
+        --line: rgba(var(--palette-neutral-8, 234, 234, 234), 1);
+        --line-strong: rgba(var(--palette-neutral-20, 200, 200, 200), 1);
+        --soft: rgba(var(--palette-neutral-4, 244, 244, 244), 1);
+        --hover: rgba(var(--palette-neutral-8, 234, 234, 234), 1);
+        --accent: var(--communication-background, #0078d4);
+        --accent-fg: var(--text-on-communication-background, #ffffff);
+        --link: var(--communication-foreground, #005a9e);
+        --focus: var(--focus-border-color, rgba(0, 120, 212, 0.77));
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; width: 100%; margin: 0; overflow-x: hidden; }
+      body {
+        display: flex; flex-direction: column; gap: 12px; padding: 0 2px 2px;
+        font-family: "Segoe UI", "-apple-system", BlinkMacSystemFont, Roboto, "Helvetica Neue", Helvetica, Ubuntu, Arial, sans-serif;
+        font-size: 0.875rem; line-height: 1.43; color: var(--fg); background: var(--bg);
+      }
+      [hidden] { display: none !important; }
+
+      /* Buttons follow the Azure DevOps button: flat, 2px radius, semibold. */
+      button {
+        font: inherit; font-weight: 600; padding: 6px 12px; border: 1px solid transparent; border-radius: 2px;
+        background: var(--soft); color: var(--fg); cursor: pointer; white-space: nowrap;
+      }
+      button:hover:not(:disabled) { background: var(--hover); }
+      button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
+      button.primary { background: var(--accent); color: var(--accent-fg); }
+      button.primary:hover:not(:disabled) { filter: brightness(1.1); background: var(--accent); }
+      button.subtle { background: transparent; color: var(--link); padding: 4px 8px; }
+      button:disabled { opacity: 0.45; cursor: default; }
+
+      input, select, textarea {
+        font: inherit; color: var(--fg); background: var(--field); width: 100%; padding: 6px 8px;
+        border: 1px solid var(--line-strong); border-radius: 2px;
+      }
+      input::placeholder, textarea::placeholder { color: var(--muted); }
+      label { display: block; margin: 12px 0 4px; font-weight: 600; }
+
+      header { display: flex; align-items: center; gap: 8px; min-height: 32px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+      #subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+      #subject b { color: var(--fg); }
+
+      #settings { border: 1px solid var(--line); border-radius: 4px; padding: 4px 16px 16px; }
+      #settings p { color: var(--muted); margin: 12px 0; }
+      #settings-message { color: var(--status-error-foreground, #cd4a45); margin-top: 12px; }
+      #settings-message:empty { display: none; }
+
+      main { flex: 1; min-height: 0; overflow-y: auto; padding-right: 6px; }
+      #picker p { margin: 0 0 12px; }
+      #picker .choices { display: flex; flex-wrap: wrap; gap: 8px; }
+
+      .bubble { border-radius: 4px; padding: 8px 12px; margin: 0 0 8px; max-width: 90%; overflow-wrap: anywhere; }
+      .bubble p { margin: 0 0 8px; } .bubble p:last-child { margin-bottom: 0; }
+      .bubble.user { background: var(--accent); color: var(--accent-fg); margin-left: auto; width: fit-content; }
+      .bubble.assistant { background: var(--soft); width: fit-content; }
+      .bubble.notice { max-width: 100%; color: var(--muted); padding: 4px 0; }
+      .bubble.error { max-width: 100%; background: rgba(205, 74, 69, 0.14); border-left: 3px solid #cd4a45; border-radius: 2px; }
+      .typing { color: var(--muted); font-style: italic; }
+
+      #proposal h3 { font-size: 0.875rem; font-weight: 600; margin: 16px 0 8px; }
+      .card { border: 1px solid var(--line); border-radius: 4px; padding: 10px 14px; margin: 0 0 8px; background: var(--field); }
+      .card h3, .card h4, .card h5, .card h6 { font-size: 0.875rem; font-weight: 600; margin: 12px 0 4px; }
+      .card > :first-child { margin-top: 0; }
+      .card p { margin: 0 0 8px; } .card ul, .card ol { margin: 0 0 8px; padding-left: 22px; }
+      ul.card { padding-left: 34px; }
+      details.card summary { cursor: pointer; font-weight: 600; }
+      details.card[open] summary { margin-bottom: 8px; }
+      .after { font-weight: 400; color: var(--muted); margin-left: 8px; font-size: 0.75rem; }
+      code { background: var(--soft); padding: 1px 4px; border-radius: 2px; font-family: Consolas, "Courier New", monospace; font-size: 0.8125rem; }
+
+      footer { border-top: 1px solid var(--line); padding-top: 12px; }
+      /* The reply box and its Send button share one row, like a chat input. */
+      .composer { display: flex; gap: 8px; align-items: flex-end; }
+      #notes { flex: 1; min-width: 0; height: 60px; resize: vertical; display: block; }
+      /* Dialog buttons sit on the right with the primary one last. */
+      .buttons { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+      .buttons .subtle { margin-right: auto; padding-left: 0; }
+      #settings .buttons { justify-content: flex-start; }
+      #settings, header, footer { flex-shrink: 0; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div id="subject"></div>
+      <button id="open-settings" type="button" class="subtle">Model settings</button>
+    </header>
+    <section id="settings" hidden>
+      <div id="settings-message"></div>
+      <label for="provider">Provider</label>
+      <select id="provider">
+        <option value="anthropic">Claude (Anthropic)</option>
+        <option value="openai-compatible">Other (OpenAI-compatible API)</option>
+      </select>
+      <label for="model">Model</label>
+      <input id="model" type="text" autocomplete="off" />
+      <div id="base-url-row">
+        <label for="base-url">Base URL</label>
+        <input id="base-url" type="url" placeholder="https://api.openai.com/v1" autocomplete="off" />
+      </div>
+      <label for="api-key">API key</label>
+      <input id="api-key" type="password" autocomplete="off" />
+      <p>Stored for your Azure DevOps account only. The work item text is sent from your browser straight to this provider.</p>
+      <div class="buttons"><button id="save-settings" type="button" class="primary">Save and start</button></div>
+    </section>
+    <main>
+      <div id="picker" hidden></div>
+      <div id="transcript"></div>
+      <div id="proposal" hidden></div>
+    </main>
+    <footer>
+      <div class="composer">
+        <textarea id="notes" placeholder="Reply or ask for changes (Ctrl+Enter to send)"></textarea>
+        <button id="send" type="button">Send</button>
+      </div>
+      <div class="buttons">
+        <button id="queue" type="button" class="subtle" title="Store the request on the work item for an agent session that can read the code">Queue for an agent session</button>
+        <button id="close" type="button">Close</button>
+        <button id="apply" type="button" class="primary" title="Write the proposal to Azure DevOps" disabled>Apply</button>
+      </div>
+    </footer>
+    <script src="chat.js"></script>
+  </body>
+</html>

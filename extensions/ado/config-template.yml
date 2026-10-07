@@ -1,0 +1,27 @@
+# Azure DevOps connection for etalii-spec-kit-ad.
+# Copied to .specify/extensions/ado/ado-config.yml on install and filled in by
+# `speckit.ado.setup`. Keep it flat: one `key: "value"` per line.
+# No secrets belong in this file.
+
+# Organization (or collection) URL, for example https://dev.azure.com/contoso
+organization_url: ""
+
+# Team project that holds the backlog.
+project: ""
+
+# Optional team, area path and iteration path for new items. Empty means new
+# children inherit area and iteration from their parent.
+team: ""
+area_path: ""
+iteration_path: ""
+
+# How to sign in: "azure-cli" (uses `az login`) or "pat".
+auth: "azure-cli"
+
+# Name of the environment variable that holds the personal access token when
+# auth is "pat". The token itself is never stored here.
+pat_env: "AZURE_DEVOPS_EXT_PAT"
+
+# Work item types from the top level down to tasks. Any depth of two or more
+# works, for example "Initiative > Epic > Feature > User Story > Task".
+hierarchy: "Epic > Feature > User Story > Task"

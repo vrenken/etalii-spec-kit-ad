@@ -1,0 +1,75 @@
+schema_version: "1.0"
+
+extension:
+  id: ado
+  name: "Azure DevOps Work Items"
+  version: "0.1.0"
+  description: "etalii-spec-kit-ad: keep specifications in Azure DevOps work items so agents and a human team share one backlog"
+  author: etalii
+  repository: https://github.com/vrenken/etalii-spec-kit-ad
+  license: MIT
+
+requires:
+  # Extension-local "scripts/..." paths and __SPECKIT_COMMAND_*__ tokens are
+  # only rendered correctly in every registerable layout from 0.12.17 on.
+  speckit_version: ">=0.12.17"
+  tools:
+    - name: python
+      required: true
+      description: "Runs the work item helper (standard library only)"
+    - name: az
+      required: false
+      description: "Azure CLI sign-in; the alternative is a personal access token in an environment variable"
+      install_url: "https://learn.microsoft.com/cli/azure/install-azure-cli"
+    - name: azure-devops-mcp
+      required: false
+      description: "Optional Azure DevOps MCP server for searching and reading work items"
+      install_url: "https://github.com/microsoft/azure-devops-mcp"
+
+provides:
+  commands:
+    - name: speckit.ado.setup
+      file: commands/speckit.ado.setup.md
+      description: "Connect this project to Azure DevOps and provision the custom fields"
+    - name: speckit.ado.specify
+      file: commands/speckit.ado.specify.md
+      description: "Create a work item, or write the specification of an existing one"
+    - name: speckit.ado.subdivide
+      file: commands/speckit.ado.subdivide.md
+      description: "Subdivide a portfolio item into the next level, for example an epic into features"
+    - name: speckit.ado.decompose
+      file: commands/speckit.ado.decompose.md
+      description: "Decompose a feature into stories"
+    - name: speckit.ado.plan
+      file: commands/speckit.ado.plan.md
+      description: "Plan a feature or story into dependency-ordered tasks"
+    - name: speckit.ado.regenerate
+      file: commands/speckit.ado.regenerate.md
+      description: "Regenerate the specification of an initiative, epic, feature or story from scratch"
+    - name: speckit.ado.refine
+      file: commands/speckit.ado.refine.md
+      description: "Refine the specification of an initiative, epic, feature or story from feedback"
+    - name: speckit.ado.analyze
+      file: commands/speckit.ado.analyze.md
+      description: "Analyse whether the children of an item are consistent with it and with each other"
+    - name: speckit.ado.implement
+      file: commands/speckit.ado.implement.md
+      description: "Claim an approved task, implement it and keep its progress up to date"
+    - name: speckit.ado.handover
+      file: commands/speckit.ado.handover.md
+      description: "Hand a task over to a person or another agent so the work can be resumed"
+    - name: speckit.ado.requests
+      file: commands/speckit.ado.requests.md
+      description: "Pick up the agent requests people raised from the Azure DevOps backlog menu"
+
+  config:
+    - name: "ado-config.yml"
+      template: "config-template.yml"
+      description: "Azure DevOps connection and work item hierarchy"
+      required: true
+
+tags:
+  - "azure-devops"
+  - "work-items"
+  - "team"
+  - "integration"
