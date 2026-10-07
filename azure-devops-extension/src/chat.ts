@@ -310,9 +310,11 @@ async function start(): Promise<void> {
   await SDK.init({ applyTheme: true });
   await SDK.ready();
   configuration = SDK.getConfiguration() as PanelConfiguration;
-  // The frame cannot measure the host window, so size the dialog from the
-  // screen: about 70% wide and, allowing for browser chrome, 70% high.
-  SDK.resize(Math.round(window.screen.availWidth * 0.7), Math.round((window.screen.availHeight - 140) * 0.7));
+  // Azure DevOps fixes the width of a dialog, so only the height is ours to
+  // set: about 70% of the browser window, which outerHeight reports even from
+  // inside this frame. Asking for more width only adds a scrollbar.
+  const windowHeight = window.outerHeight || window.screen.availHeight;
+  SDK.resize(undefined, Math.max(420, Math.round((windowHeight - 130) * 0.7)));
 
   const dataService = await SDK.getService<IExtensionDataService>("ms.vss-features.extension-data-service");
   dataManager = await dataService.getExtensionDataManager(SDK.getExtensionContext().id, await SDK.getAccessToken());

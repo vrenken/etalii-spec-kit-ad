@@ -23,7 +23,7 @@
         --focus: var(--focus-border-color, rgba(0, 120, 212, 0.77));
       }
       * { box-sizing: border-box; }
-      html, body { height: 100%; margin: 0; }
+      html, body { height: 100%; width: 100%; margin: 0; overflow-x: hidden; }
       body {
         display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 2px;
         font-family: "Segoe UI", "-apple-system", BlinkMacSystemFont, Roboto, "Helvetica Neue", Helvetica, Ubuntu, Arial, sans-serif;
@@ -85,6 +85,8 @@
       footer { border-top: 1px solid var(--line); padding-top: 12px; }
       #notes { height: 60px; resize: vertical; display: block; }
       .buttons { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+      #settings { flex-shrink: 0; }
+      header, footer { flex-shrink: 0; }
       .spacer { flex: 1; }
     </style>
   </head>
