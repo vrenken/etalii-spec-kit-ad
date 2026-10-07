@@ -1,0 +1,82 @@
+name: Publish Azure DevOps extension
+
+# Builds the Azure Boards plugin in azure-devops-extension/ and publishes it to
+# the Visual Studio Marketplace. The extension is private: publishing makes a
+# new version available only to the organizations it is shared with.
+#
+# Requires the repository secret VS_MARKETPLACE_TOKEN: an Azure DevOps personal
+# access token for the publisher's account with organization "All accessible
+# organizations" and scope "Marketplace: Manage".
+#
+# The Marketplace refuses a version it has already seen, so each run publishes
+# <major>.<minor> from vss-extension.json with the run number as the patch.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "azure-devops-extension/**"
+      - ".github/workflows/publish-azure-devops-extension.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-azure-devops-extension
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: azure-devops-extension
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: azure-devops-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check and test
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Compute version
+        id: version
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          base=$(node -p "require('./vss-extension.json').version.split('.').slice(0, 2).join('.')")
+          echo "version=${base}.${RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to the Visual Studio Marketplace
+        env:
+          VS_MARKETPLACE_TOKEN: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "$VS_MARKETPLACE_TOKEN" ]; then
+            echo "::error::The VS_MARKETPLACE_TOKEN secret is not set; nothing was published."
+            exit 1
+          fi
+          npx --yes tfx-cli@0.24.2 extension publish \
+            --manifest-globs vss-extension.json \
+            --override "{\"version\": \"${VERSION}\"}" \
+            --auth-type pat \
+            --token "$VS_MARKETPLACE_TOKEN" \
+            --no-prompt
+          echo "Published version ${VERSION}" >> "$GITHUB_STEP_SUMMARY"

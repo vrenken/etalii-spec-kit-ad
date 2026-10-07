@@ -43,10 +43,22 @@ npm test
 npm run package
 ```
 
-`npm run package` writes a `.vsix` to `out/`. Before packaging, set
-`publisher` in `vss-extension.json` to a Visual Studio Marketplace publisher
-you own, then upload the `.vsix` there, share it with your organization and
-install it.
+`npm run package` writes a `.vsix` to `out/`, which can be uploaded by hand at
+<https://marketplace.visualstudio.com/manage>.
+
+## Automatic publishing
+
+The workflow `.github/workflows/publish-azure-devops-extension.yml` tests,
+builds and publishes the plugin whenever a change under
+`azure-devops-extension/` reaches `main`, and can be started by hand from the
+Actions tab. It needs one repository secret, `VS_MARKETPLACE_TOKEN`: an Azure
+DevOps personal access token for the publisher's account, created for **All
+accessible organizations** with the scope **Marketplace: Manage**.
+
+Each run publishes the major and minor version from `vss-extension.json` with
+the run number as the patch, because the Marketplace refuses a version it has
+already seen. The extension is private; share it once with your organization
+from the publisher page, and later versions arrive there by themselves.
 
 ## Status
 
