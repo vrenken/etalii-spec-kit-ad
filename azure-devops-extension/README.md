@@ -35,8 +35,7 @@ answers with a short message and a proposal:
 - a list of findings, for *Analyse*.
 
 You can reply to ask for changes; each answer carries the complete updated
-proposal. Nothing is written to Azure DevOps until you press **Apply to Azure
-DevOps**. Applying then:
+proposal. Nothing is written to Azure DevOps until you press **Apply**. Applying then:
 
 - writes a specification to the *Etalii Specification* field as markdown, passing
   through *Worked on by agent* to *Ready for review by user*;

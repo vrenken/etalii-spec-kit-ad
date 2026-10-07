@@ -205,7 +205,8 @@ function refreshControls(): void {
   ($("send") as HTMLButtonElement).disabled = busy || !chosen;
   ($("apply") as HTMLButtonElement).disabled = busy || !proposal;
   ($("queue") as HTMLButtonElement).disabled = busy || !chosen;
-  $("apply").textContent = proposal?.kind === "analysis" ? "Add to discussion" : "Apply to Azure DevOps";
+  // Short labels: the dialog is narrow. The tooltip carries the full meaning.
+  $("apply").textContent = proposal?.kind === "analysis" ? "Add to discussion" : "Apply";
 }
 
 function setBusy(value: boolean): void {

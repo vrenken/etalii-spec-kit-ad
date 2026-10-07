@@ -10,7 +10,8 @@
         fallbacks are the light theme values.
       */
       :root {
-        --bg: var(--background-color, #ffffff);
+        --bg: var(--callout-background-color, var(--background-color, #ffffff));
+        --field: var(--background-color, #ffffff);
         --fg: var(--text-primary-color, rgba(0, 0, 0, 0.9));
         --muted: var(--text-secondary-color, rgba(0, 0, 0, 0.55));
         --line: rgba(var(--palette-neutral-8, 234, 234, 234), 1);
@@ -25,7 +26,7 @@
       * { box-sizing: border-box; }
       html, body { height: 100%; width: 100%; margin: 0; overflow-x: hidden; }
       body {
-        display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 2px;
+        display: flex; flex-direction: column; gap: 12px; padding: 0 2px 2px;
         font-family: "Segoe UI", "-apple-system", BlinkMacSystemFont, Roboto, "Helvetica Neue", Helvetica, Ubuntu, Arial, sans-serif;
         font-size: 0.875rem; line-height: 1.43; color: var(--fg); background: var(--bg);
       }
@@ -44,17 +45,17 @@
       button:disabled { opacity: 0.45; cursor: default; }
 
       input, select, textarea {
-        font: inherit; color: var(--fg); background: var(--bg); width: 100%; padding: 6px 8px;
+        font: inherit; color: var(--fg); background: var(--field); width: 100%; padding: 6px 8px;
         border: 1px solid var(--line-strong); border-radius: 2px;
       }
       input::placeholder, textarea::placeholder { color: var(--muted); }
       label { display: block; margin: 12px 0 4px; font-weight: 600; }
 
-      header { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+      header { display: flex; align-items: center; gap: 8px; min-height: 32px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
       #subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
       #subject b { color: var(--fg); }
 
-      #settings { border: 1px solid var(--line); border-radius: 4px; padding: 4px 16px 16px; background: var(--soft); }
+      #settings { border: 1px solid var(--line); border-radius: 4px; padding: 4px 16px 16px; }
       #settings p { color: var(--muted); margin: 12px 0; }
       #settings-message { color: var(--status-error-foreground, #cd4a45); margin-top: 12px; }
       #settings-message:empty { display: none; }
@@ -63,7 +64,7 @@
       #picker p { margin: 0 0 12px; }
       #picker .choices { display: flex; flex-wrap: wrap; gap: 8px; }
 
-      .bubble { border-radius: 4px; padding: 8px 12px; margin: 0 0 8px; max-width: 85%; overflow-wrap: anywhere; }
+      .bubble { border-radius: 4px; padding: 8px 12px; margin: 0 0 8px; max-width: 90%; overflow-wrap: anywhere; }
       .bubble p { margin: 0 0 8px; } .bubble p:last-child { margin-bottom: 0; }
       .bubble.user { background: var(--accent); color: var(--accent-fg); margin-left: auto; width: fit-content; }
       .bubble.assistant { background: var(--soft); width: fit-content; }
@@ -72,7 +73,7 @@
       .typing { color: var(--muted); font-style: italic; }
 
       #proposal h3 { font-size: 0.875rem; font-weight: 600; margin: 16px 0 8px; }
-      .card { border: 1px solid var(--line); border-radius: 4px; padding: 10px 14px; margin: 0 0 8px; background: var(--bg); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+      .card { border: 1px solid var(--line); border-radius: 4px; padding: 10px 14px; margin: 0 0 8px; background: var(--field); }
       .card h3, .card h4, .card h5, .card h6 { font-size: 0.875rem; font-weight: 600; margin: 12px 0 4px; }
       .card > :first-child { margin-top: 0; }
       .card p { margin: 0 0 8px; } .card ul, .card ol { margin: 0 0 8px; padding-left: 22px; }
@@ -83,11 +84,14 @@
       code { background: var(--soft); padding: 1px 4px; border-radius: 2px; font-family: Consolas, "Courier New", monospace; font-size: 0.8125rem; }
 
       footer { border-top: 1px solid var(--line); padding-top: 12px; }
-      #notes { height: 60px; resize: vertical; display: block; }
-      .buttons { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
-      #settings { flex-shrink: 0; }
-      header, footer { flex-shrink: 0; }
-      .spacer { flex: 1; }
+      /* The reply box and its Send button share one row, like a chat input. */
+      .composer { display: flex; gap: 8px; align-items: flex-end; }
+      #notes { flex: 1; min-width: 0; height: 60px; resize: vertical; display: block; }
+      /* Dialog buttons sit on the right with the primary one last. */
+      .buttons { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+      .buttons .subtle { margin-right: auto; padding-left: 0; }
+      #settings .buttons { justify-content: flex-start; }
+      #settings, header, footer { flex-shrink: 0; }
     </style>
   </head>
   <body>
@@ -119,13 +123,14 @@
       <div id="proposal" hidden></div>
     </main>
     <footer>
-      <textarea id="notes" placeholder="Reply or ask for changes (Ctrl+Enter to send)"></textarea>
-      <div class="buttons">
+      <div class="composer">
+        <textarea id="notes" placeholder="Reply or ask for changes (Ctrl+Enter to send)"></textarea>
         <button id="send" type="button">Send</button>
-        <span class="spacer"></span>
-        <button id="queue" type="button" title="Store the request on the work item for an agent session that can read the code">Queue for an agent session</button>
-        <button id="apply" type="button" class="primary" disabled>Apply to Azure DevOps</button>
+      </div>
+      <div class="buttons">
+        <button id="queue" type="button" class="subtle" title="Store the request on the work item for an agent session that can read the code">Queue for an agent session</button>
         <button id="close" type="button">Close</button>
+        <button id="apply" type="button" class="primary" title="Write the proposal to Azure DevOps" disabled>Apply</button>
       </div>
     </footer>
     <script src="chat.js"></script>
