@@ -56,7 +56,7 @@ DevOps personal access token for the publisher's account, created for **All
 accessible organizations** with the scope **Marketplace: Manage**.
 
 Each run publishes the major and minor version from `vss-extension.json` with
-the run number as the patch, because the Marketplace refuses a version it has
+a patch built from the run number and attempt, because the Marketplace refuses a version it has
 already seen. The extension is private; share it once with your organization
 from the publisher page, and later versions arrive there by themselves.
 

@@ -9,7 +9,9 @@ name: Publish Azure DevOps extension
 # organizations" and scope "Marketplace: Manage".
 #
 # The Marketplace refuses a version it has already seen, so each run publishes
-# <major>.<minor> from vss-extension.json with the run number as the patch.
+# <major>.<minor> from vss-extension.json with a patch built from the run
+# number and the attempt (run 7, attempt 1 is patch 701), so a re-run gets a
+# higher version too.
 
 on:
   push:
@@ -58,10 +60,11 @@ jobs:
         id: version
         env:
           RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           set -euo pipefail
           base=$(node -p "require('./vss-extension.json').version.split('.').slice(0, 2).join('.')")
-          echo "version=${base}.${RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "version=${base}.$((RUN_NUMBER * 100 + RUN_ATTEMPT))" >> "$GITHUB_OUTPUT"
 
       - name: Publish to the Visual Studio Marketplace
         env:
@@ -78,5 +81,6 @@ jobs:
             --override "{\"version\": \"${VERSION}\"}" \
             --auth-type pat \
             --token "$VS_MARKETPLACE_TOKEN" \
+            --no-wait-validation \
             --no-prompt
           echo "Published version ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
