@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "id": "etalii-spec-kit-ad",
-  "publisher": "etalii",
+  "publisher": "vrenken",
   "version": "0.1.0",
   "name": "Etalii Spec Kit",
   "description": "Spec-driven development with agents and people on one Azure DevOps backlog: ask an agent to specify, break down, refine or analyse a work item from its menu.",
