@@ -21,6 +21,12 @@ Spec Kit is an open source toolkit that gives AI coding agents structured
 processes, reusable templates, and documented outcomes. Start with one of the
 three processes below, customize it, or bring your own.
 
+> **etalii-spec-kit-ad** — this fork adds team-based Spec-Driven Development on
+> Azure DevOps. Specifications live in work items instead of markdown files, and
+> agents and people share one backlog. See the
+> [`ado` extension](extensions/ado/README.md) and the
+> [Azure DevOps plugin](azure-devops-extension/README.md).
+
 ## Choose your process
 
 | What you need | Process | Outcome |

@@ -34,8 +34,9 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 API_VERSION = "7.1"
 COMMENTS_API_VERSION = "7.1-preview.4"
@@ -238,7 +239,7 @@ def acquire_authorization(config: Config) -> str:
     if not resolved or not os.path.isabs(resolved):
         raise AdoError("Azure CLI (az) was not found. Install it or switch auth to 'pat'.")
     try:
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             [resolved, "account", "get-access-token", "--resource", ADO_RESOURCE_ID, "--output", "json"],
             capture_output=True,
             text=True,
@@ -254,9 +255,9 @@ def acquire_authorization(config: Config) -> str:
 
 
 def urllib_transport(method: str, url: str, headers: dict[str, str], body: bytes | None) -> tuple[int, Any]:
-    request = urllib.request.Request(url, data=body, method=method, headers=headers)  # noqa: S310
+    request = urllib.request.Request(url, data=body, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=60) as response:
             status, raw = response.status, response.read()
     except urllib.error.HTTPError as error:
         status, raw = error.code, error.read()
@@ -727,7 +728,7 @@ def analyze(client: AdoClient, root_id: int) -> dict[str, Any]:
 
 def git_value(*args: str) -> str:
     try:
-        result = subprocess.run(["git", *args], capture_output=True, text=True, timeout=15, check=False)  # noqa: S603, S607
+        result = subprocess.run(["git", *args], capture_output=True, text=True, timeout=15, check=False)
     except (OSError, subprocess.TimeoutExpired):
         return ""
     return result.stdout.strip() if result.returncode == 0 else ""

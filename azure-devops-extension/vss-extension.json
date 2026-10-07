@@ -1,0 +1,42 @@
+{
+  "manifestVersion": 1,
+  "id": "etalii-spec-kit-ad",
+  "publisher": "etalii",
+  "version": "0.1.0",
+  "name": "Etalii Spec Kit",
+  "description": "Spec-driven development with agents and people on one Azure DevOps backlog: ask an agent to specify, break down, refine or analyse a work item from its menu.",
+  "public": false,
+  "categories": ["Azure Boards"],
+  "targets": [{ "id": "Microsoft.VisualStudio.Services" }],
+  "scopes": ["vso.work_write"],
+  "content": {
+    "details": { "path": "README.md" }
+  },
+  "files": [{ "path": "dist", "addressable": true }],
+  "contributions": [
+    {
+      "id": "work-item-menu",
+      "type": "ms.vss-web.action-provider",
+      "description": "Agent actions on the backlog, board and work item menus",
+      "targets": [
+        "ms.vss-work-web.work-item-context-menu",
+        "ms.vss-work-web.backlog-item-menu",
+        "ms.vss-work-web.backlog-board-card-item-menu",
+        "ms.vss-work-web.work-item-toolbar-menu"
+      ],
+      "properties": {
+        "uri": "dist/menu.html",
+        "registeredObjectId": "etalii-spec-kit-menu"
+      }
+    },
+    {
+      "id": "request-dialog",
+      "type": "ms.vss-web.external-content",
+      "description": "Collects optional instructions for the agent",
+      "targets": [],
+      "properties": {
+        "uri": "dist/dialog.html"
+      }
+    }
+  ]
+}

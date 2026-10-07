@@ -26,7 +26,7 @@ sys.modules["ado_helper"] = ado
 _spec.loader.exec_module(ado)
 
 
-def make_config(hierarchy: str = "Epic > Feature > User Story > Task") -> "ado.Config":
+def make_config(hierarchy: str = "Epic > Feature > User Story > Task") -> ado.Config:
     return ado.Config({"organization_url": ORG, "project": "Shop", "auth": "pat", "hierarchy": hierarchy})
 
 
@@ -36,7 +36,7 @@ def fake() -> FakeAdo:
 
 
 @pytest.fixture
-def client(fake: FakeAdo) -> "ado.AdoClient":
+def client(fake: FakeAdo) -> ado.AdoClient:
     return ado.AdoClient(make_config(), transport=fake, authorization="Basic test")
 
 

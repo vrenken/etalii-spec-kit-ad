@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Etalii Spec Kit request</title>
+    <style>
+      body { font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px; margin: 0; padding: 4px 0 0; }
+      label { display: block; margin-bottom: 6px; }
+      textarea { box-sizing: border-box; width: 100%; height: 110px; padding: 6px; font: inherit; }
+      p { color: #605e5c; margin: 8px 0 12px; }
+      .buttons { display: flex; justify-content: flex-end; gap: 8px; }
+      button { font: inherit; padding: 6px 16px; border: 1px solid #8a8886; border-radius: 2px; background: #fff; cursor: pointer; }
+      button.primary { background: #0078d4; border-color: #0078d4; color: #fff; }
+    </style>
+  </head>
+  <body>
+    <label for="notes">Instructions for the agent (optional)</label>
+    <textarea id="notes"></textarea>
+    <p>The request is stored on the work item. An agent picks it up the next time its request queue is processed.</p>
+    <div class="buttons">
+      <button id="cancel" type="button">Cancel</button>
+      <button id="queue" type="button" class="primary">Queue request</button>
+    </div>
+    <script src="dialog.js"></script>
+  </body>
+</html>

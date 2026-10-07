@@ -1,0 +1,23 @@
+{
+  "name": "etalii-spec-kit-ad-azure-devops-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Azure DevOps plugin for etalii-spec-kit-ad: backlog and board menu actions that queue work for agents",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/model.test.ts",
+    "build": "node build.mjs",
+    "package": "npm run build && npx --yes tfx-cli extension create --manifest-globs vss-extension.json --output-path out"
+  },
+  "dependencies": {
+    "azure-devops-extension-api": "^5.279.1",
+    "azure-devops-extension-sdk": "^4.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}
