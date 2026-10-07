@@ -560,7 +560,7 @@ class TestSetup:
     def test_provision_creates_fields_and_scopes_implementation_fields_to_tasks(self, fake, client):
         ado.provision_fields(client, dry_run=False)
         assert {d[0] for d in ado.FIELD_DEFINITIONS} <= fake.fields
-        assert [p["items"] for p in fake.picklists if p["name"] == "Custom.EtaliiSpecificationState.Values"] == [
+        assert [p["items"] for p in fake.picklists if p["name"] == "Custom_EtaliiSpecificationState_Values"] == [
             ["○ Open", "👁 Ready for review by user", "✅ Approved by user", "↻ Requires finetuning by agent", "⚙ Worked on by agent"]
         ]
         assert ado.F_SPEC in fake.type_fields["ShopAgile.Epic"]

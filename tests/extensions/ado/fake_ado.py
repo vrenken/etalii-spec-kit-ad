@@ -175,6 +175,11 @@ class FakeAdo:
             if method != "GET":
                 assert method == ("PATCH" if key == "rules" else "PUT")
                 board[key] = payload[key]
+                if key == "rules":
+                    # Like the real service: echo rules back with extra detail.
+                    for rule in board[key].get("fill", []):
+                        rule["isEnabled"] = "True"
+                        rule["clauses"] = [{"index": 1}]
             return 200, {key: json.loads(json.dumps(board[key]))}
         layout = r"/contoso/_apis/work/processes/p1/workitemtypes/([^/]+)/layout"
         match = re.fullmatch(layout, path)

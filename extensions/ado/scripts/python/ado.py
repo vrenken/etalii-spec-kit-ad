@@ -985,6 +985,11 @@ def inherit_process(client: AdoClient, *, name: str, dry_run: bool, wait_seconds
     return {"process": name.strip(), "dry_run": False, "actions": actions}
 
 
+def picklist_name(reference: str) -> str:
+    # Picklist names may not contain dots or other punctuation.
+    return reference.replace(".", "_") + "_Values"
+
+
 def provision_fields(client: AdoClient, *, dry_run: bool) -> dict[str, Any]:
     """Create the custom fields and add them to the hierarchy's work item types.
 
@@ -1017,7 +1022,7 @@ def provision_fields(client: AdoClient, *, dry_run: bool) -> dict[str, Any]:
             picklist = client.request(
                 "POST",
                 client._org("work/processes/lists"),
-                {"name": f"{reference}.Values", "type": "String", "items": list(labels.values()), "isSuggested": False},
+                {"name": picklist_name(reference), "type": "String", "items": list(labels.values()), "isSuggested": False},
             )
             body.update({"isPicklist": True, "picklistId": picklist["id"]})
         client.request("POST", client._org("wit/fields"), body)
@@ -1086,7 +1091,7 @@ def _provision_layout(
     def add_group(section: str, body: dict[str, Any]) -> dict[str, Any]:
         if page is None:
             raise AdoError(f"The form of {type_name} has no page to add fields to.")
-        url = client._org(f"{layout_path}/pages/{page['id']}/sections/{section}/groups")
+        url = client._org(f"{layout_path}/pages/{urllib.parse.quote(page['id'])}/sections/{section}/groups")
         return client.request("POST", url, body)
 
     if F_SPEC not in on_form:
@@ -1105,7 +1110,7 @@ def _provision_layout(
             for field_reference, name, _, _, _ in plain:
                 client.request(
                     "POST",
-                    client._org(f"{layout_path}/groups/{group['id']}/controls"),
+                    client._org(f"{layout_path}/groups/{urllib.parse.quote(group['id'])}/controls"),
                     {"id": field_reference, "label": name.removeprefix("Etalii "), "visible": True, "readOnly": False, "isContributed": False},
                 )
     return actions
@@ -1143,7 +1148,12 @@ def style_boards(client: AdoClient, *, dry_run: bool) -> dict[str, Any]:
         ]
         fill = rules.get("fill") or []
         merged = ours + [r for r in fill if r.get("name") not in {rule[0] for rule in CARD_RULES}]
-        if merged != fill:
+        # The server echoes rules back with extra detail (parsed clauses, a
+        # differently cased flag), so compare what we actually set.
+        def essence(rule_list: list[dict[str, Any]]) -> list[tuple[Any, Any, Any]]:
+            return [(r.get("name"), r.get("filter"), r.get("settings")) for r in rule_list]
+
+        if essence(merged) != essence(fill):
             actions.append(f"set card tints on board {name}")
             if not dry_run:
                 client.request("PATCH", f"{board_url}/cardrulesettings", {"rules": {**rules, "fill": merged}})
