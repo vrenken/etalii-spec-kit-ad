@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -7,8 +8,10 @@ import {
   commonActions,
   levelOf,
   levelsFromBacklogs,
+  MENU_ACTIONS,
   menuText,
   requestPatch,
+  resolveAction,
   selectedIds,
 } from "./model.ts";
 
@@ -95,4 +98,34 @@ test("only refine sends the specification back to the agent", () => {
   for (const action of ["describe", "subdivide", "decompose", "plan", "regenerate", "analyse"] as const) {
     assert.deepEqual(states(action), []);
   }
+});
+
+test("a menu pick resolves to the breakdown word the level uses", () => {
+  assert.equal(resolveAction("subdivide", 0, 4), "subdivide");
+  assert.equal(resolveAction("decompose", 0, 4), "subdivide");
+  assert.equal(resolveAction("subdivide", 1, 4), "decompose");
+  assert.equal(resolveAction("decompose", 1, 4), "decompose");
+  assert.equal(resolveAction("refine", 2, 4), "refine");
+});
+
+test("a menu pick that does not fit the level resolves to nothing", () => {
+  assert.equal(resolveAction("plan", 0, 4), undefined);
+  assert.equal(resolveAction("subdivide", 2, 4), undefined);
+  assert.equal(resolveAction("describe", 3, 4), undefined);
+  assert.equal(resolveAction("analyse", -1, 4), undefined);
+});
+
+test("the manifest declares one menu entry per action, wired to its handler", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../vss-extension.json", import.meta.url), "utf8"));
+  const entries = manifest.contributions.filter((contribution: { type: string }) => contribution.type === "ms.vss-web.action");
+  assert.deepEqual(
+    entries.map((entry: { properties: { registeredObjectId: string } }) => entry.properties.registeredObjectId),
+    MENU_ACTIONS.map((action) => `etalii-spec-kit-${action}`),
+  );
+  for (const [index, entry] of entries.entries()) {
+    assert.equal(entry.properties.text, menuText(MENU_ACTIONS[index]));
+    assert.equal(entry.properties.uri, "dist/menu.html");
+    assert.ok(entry.targets.includes("ms.vss-work-web.backlog-item-menu"));
+  }
+  assert.ok(manifest.contributions.some((contribution: { id: string }) => contribution.id === "chat-panel"));
 });

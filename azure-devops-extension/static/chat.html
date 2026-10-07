@@ -4,52 +4,95 @@
     <meta charset="utf-8" />
     <title>Etalii Spec Kit chat</title>
     <style>
+      /*
+        Azure DevOps hands its theme to the frame as CSS variables. Palette
+        variables are "r, g, b" triplets, so they are wrapped in rgba(); the
+        fallbacks are the light theme values.
+      */
       :root {
         --bg: var(--background-color, #ffffff);
-        --fg: var(--text-primary-color, #201f1e);
-        --muted: var(--text-secondary-color, #605e5c);
-        --line: var(--palette-neutral-10, #e1dfdd);
-        --soft: var(--palette-neutral-4, #f3f2f1);
+        --fg: var(--text-primary-color, rgba(0, 0, 0, 0.9));
+        --muted: var(--text-secondary-color, rgba(0, 0, 0, 0.55));
+        --line: rgba(var(--palette-neutral-8, 234, 234, 234), 1);
+        --line-strong: rgba(var(--palette-neutral-20, 200, 200, 200), 1);
+        --soft: rgba(var(--palette-neutral-4, 244, 244, 244), 1);
+        --hover: rgba(var(--palette-neutral-8, 234, 234, 234), 1);
         --accent: var(--communication-background, #0078d4);
+        --accent-fg: var(--text-on-communication-background, #ffffff);
+        --link: var(--communication-foreground, #005a9e);
+        --focus: var(--focus-border-color, rgba(0, 120, 212, 0.77));
       }
+      * { box-sizing: border-box; }
       html, body { height: 100%; margin: 0; }
-      body { display: flex; flex-direction: column; font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px; color: var(--fg); background: var(--bg); }
-      header { display: flex; justify-content: flex-end; padding: 0 0 6px; }
-      #settings { border: 1px solid var(--line); border-radius: 4px; padding: 12px; margin-bottom: 10px; }
-      #settings label { display: block; margin: 8px 0 3px; color: var(--muted); }
-      #settings input, #settings select { box-sizing: border-box; width: 100%; padding: 6px; font: inherit; }
-      #settings p { color: var(--muted); margin: 8px 0; }
-      #settings-message { color: #a4262c; min-height: 1.2em; }
-      main { flex: 1; overflow-y: auto; padding-right: 4px; }
-      .bubble { border-radius: 6px; padding: 8px 12px; margin: 0 0 8px; max-width: 92%; overflow-wrap: anywhere; }
-      .bubble p { margin: 0 0 6px; } .bubble p:last-child { margin-bottom: 0; }
-      .bubble.user { background: var(--accent); color: #fff; margin-left: auto; }
-      .bubble.assistant { background: var(--soft); }
-      .bubble.notice { background: transparent; color: var(--muted); border: 1px dashed var(--line); max-width: 100%; }
-      .bubble.error { background: #fde7e9; color: #8a1c22; max-width: 100%; }
-      .typing { color: var(--muted); font-style: italic; }
-      #proposal h3 { font-size: 13px; margin: 12px 0 6px; }
-      .card { border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; margin: 0 0 6px; }
-      .card h3, .card h4, .card h5, .card h6 { font-size: 13px; margin: 10px 0 4px; }
-      .card p { margin: 0 0 6px; } ul.card { padding-left: 28px; }
-      details.card summary { cursor: pointer; font-weight: 600; }
-      .after { font-weight: 400; color: var(--muted); margin-left: 8px; font-size: 12px; }
-      code { background: var(--soft); padding: 0 3px; border-radius: 2px; }
-      footer { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 6px; }
-      #notes { box-sizing: border-box; width: 100%; height: 64px; padding: 6px; font: inherit; resize: vertical; }
-      .buttons { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
-      .spacer { flex: 1; }
-      button { font: inherit; padding: 6px 14px; border: 1px solid #8a8886; border-radius: 2px; background: var(--bg); color: var(--fg); cursor: pointer; }
-      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-      button.link { border: none; color: var(--accent); padding: 2px 0; }
-      button:disabled { opacity: 0.5; cursor: default; }
-      #picker button { display: block; width: 100%; text-align: left; margin: 0 0 6px; padding: 9px 12px; }
-      #picker p { margin: 0 0 10px; }
+      body {
+        display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 2px;
+        font-family: "Segoe UI", "-apple-system", BlinkMacSystemFont, Roboto, "Helvetica Neue", Helvetica, Ubuntu, Arial, sans-serif;
+        font-size: 0.875rem; line-height: 1.43; color: var(--fg); background: var(--bg);
+      }
       [hidden] { display: none !important; }
+
+      /* Buttons follow the Azure DevOps button: flat, 2px radius, semibold. */
+      button {
+        font: inherit; font-weight: 600; padding: 6px 12px; border: 1px solid transparent; border-radius: 2px;
+        background: var(--soft); color: var(--fg); cursor: pointer; white-space: nowrap;
+      }
+      button:hover:not(:disabled) { background: var(--hover); }
+      button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
+      button.primary { background: var(--accent); color: var(--accent-fg); }
+      button.primary:hover:not(:disabled) { filter: brightness(1.1); background: var(--accent); }
+      button.subtle { background: transparent; color: var(--link); padding: 4px 8px; }
+      button:disabled { opacity: 0.45; cursor: default; }
+
+      input, select, textarea {
+        font: inherit; color: var(--fg); background: var(--bg); width: 100%; padding: 6px 8px;
+        border: 1px solid var(--line-strong); border-radius: 2px;
+      }
+      input::placeholder, textarea::placeholder { color: var(--muted); }
+      label { display: block; margin: 12px 0 4px; font-weight: 600; }
+
+      header { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+      #subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+      #subject b { color: var(--fg); }
+
+      #settings { border: 1px solid var(--line); border-radius: 4px; padding: 4px 16px 16px; background: var(--soft); }
+      #settings p { color: var(--muted); margin: 12px 0; }
+      #settings-message { color: var(--status-error-foreground, #cd4a45); margin-top: 12px; }
+      #settings-message:empty { display: none; }
+
+      main { flex: 1; min-height: 0; overflow-y: auto; padding-right: 6px; }
+      #picker p { margin: 0 0 12px; }
+      #picker .choices { display: flex; flex-wrap: wrap; gap: 8px; }
+
+      .bubble { border-radius: 4px; padding: 8px 12px; margin: 0 0 8px; max-width: 85%; overflow-wrap: anywhere; }
+      .bubble p { margin: 0 0 8px; } .bubble p:last-child { margin-bottom: 0; }
+      .bubble.user { background: var(--accent); color: var(--accent-fg); margin-left: auto; width: fit-content; }
+      .bubble.assistant { background: var(--soft); width: fit-content; }
+      .bubble.notice { max-width: 100%; color: var(--muted); padding: 4px 0; }
+      .bubble.error { max-width: 100%; background: rgba(205, 74, 69, 0.14); border-left: 3px solid #cd4a45; border-radius: 2px; }
+      .typing { color: var(--muted); font-style: italic; }
+
+      #proposal h3 { font-size: 0.875rem; font-weight: 600; margin: 16px 0 8px; }
+      .card { border: 1px solid var(--line); border-radius: 4px; padding: 10px 14px; margin: 0 0 8px; background: var(--bg); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+      .card h3, .card h4, .card h5, .card h6 { font-size: 0.875rem; font-weight: 600; margin: 12px 0 4px; }
+      .card > :first-child { margin-top: 0; }
+      .card p { margin: 0 0 8px; } .card ul, .card ol { margin: 0 0 8px; padding-left: 22px; }
+      ul.card { padding-left: 34px; }
+      details.card summary { cursor: pointer; font-weight: 600; }
+      details.card[open] summary { margin-bottom: 8px; }
+      .after { font-weight: 400; color: var(--muted); margin-left: 8px; font-size: 0.75rem; }
+      code { background: var(--soft); padding: 1px 4px; border-radius: 2px; font-family: Consolas, "Courier New", monospace; font-size: 0.8125rem; }
+
+      footer { border-top: 1px solid var(--line); padding-top: 12px; }
+      #notes { height: 60px; resize: vertical; display: block; }
+      .buttons { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+      .spacer { flex: 1; }
     </style>
   </head>
   <body>
-    <header><button id="open-settings" type="button" class="link">Model settings</button></header>
+    <header>
+      <div id="subject"></div>
+      <button id="open-settings" type="button" class="subtle">Model settings</button>
+    </header>
     <section id="settings" hidden>
       <div id="settings-message"></div>
       <label for="provider">Provider</label>

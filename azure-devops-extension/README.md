@@ -1,27 +1,32 @@
 # Etalii Spec Kit for Azure DevOps
 
 Browser plugin for Azure Boards that goes with the `ado` Spec Kit extension
-([`extensions/ado`](../extensions/ado/README.md)). It adds an **Etalii Spec
-Kit** entry to the work item menu on the backlog, on board cards and on the
-work item form. The entry opens a chat panel that offers the actions fitting
-that item's level:
+([`extensions/ado`](../extensions/ado/README.md)). It adds these entries to
+the work item menu on the backlog, on board cards and on the work item form.
+Each opens a chat dialog for that work item:
 
-| Action | Offered on |
+| Menu entry | Works on |
 |---|---|
 | Generate specification | every level above tasks |
-| Subdivide into ... | portfolio levels, for example an epic into features |
-| Decompose into ... | the level above stories, for example a feature into user stories |
-| Plan into tasks | features and stories |
+| Subdivide | portfolio levels, for example an epic into features |
+| Decompose | the level above stories, for example a feature into user stories |
+| Plan | features and stories, into tasks |
 | Regenerate specification | every level above tasks |
 | Refine specification | every level above tasks |
 | Analyse children for consistency | every level above tasks |
+
+The entries are the same on every work item, because Azure DevOps shows a
+declared menu entry regardless of the item's type. When an entry does not fit
+the item (for example *Plan* on an epic), the dialog says so and offers the
+ones that do. *Subdivide* and *Decompose* both mean "break down one level" and
+do the right thing on either level.
 
 The levels are read from the team's backlog configuration, so an Initiative
 level, or any other depth, works without configuring the plugin.
 
 ## What an action does
 
-After you pick an action in the panel, the plugin sends
+The plugin sends
 the item, its parent and its existing children to a model, and the model
 answers with a short message and a proposal:
 
@@ -48,8 +53,8 @@ with `/speckit.ado.requests`.
 
 ## Model settings
 
-The first time, the panel asks for the model to use; **Model settings** in the
-panel changes it later.
+The first time, the dialog asks for the model to use; **Model settings** in the
+dialog changes it later.
 
 | Setting | Notes |
 |---|---|

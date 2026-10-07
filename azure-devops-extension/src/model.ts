@@ -32,6 +32,9 @@ export const REQUEST_LABELS: Record<Action, string> = {
   analyse: "Analyse",
 };
 
+/** The actions in the order they appear on the work item menu. */
+export const MENU_ACTIONS: Action[] = ["describe", "subdivide", "decompose", "plan", "regenerate", "refine", "analyse"];
+
 export interface BacklogLevel {
   rank?: number;
   workItemTypes?: { name?: string }[];
@@ -82,6 +85,20 @@ export function actionsForLevel(level: number, depth: number): Action[] {
   }
   actions.push("regenerate", "refine", "analyse");
   return actions;
+}
+
+/**
+ * The action to run for a menu pick on an item at `level`, or undefined when
+ * it does not fit. The menu is the same for every type, so "Subdivide" on a
+ * feature and "Decompose" on an epic both mean "break down one level" and
+ * resolve to whichever of the two the level uses.
+ */
+export function resolveAction(picked: Action, level: number, depth: number): Action | undefined {
+  const available = actionsForLevel(level, depth);
+  if (picked === "subdivide" || picked === "decompose") {
+    return available.find((action) => action === "subdivide" || action === "decompose");
+  }
+  return available.includes(picked) ? picked : undefined;
 }
 
 /** Actions every selected item supports, in menu order. */

@@ -1,31 +1,32 @@
-// Adds one "Etalii Spec Kit" entry to the work item menus on the backlog, the
-// board and the work item form. It opens the chat panel for the selected work
-// item; the panel offers the actions that fit that item's level.
+// Handles the "Etalii Spec Kit" entries on the work item menus of the backlog,
+// the board and the work item form. Each entry is a plain menu action declared
+// in the manifest, so it shows up without any code running first; clicking one
+// opens the chat dialog for the selected work item with that action.
 //
-// The entry is a plain menu action declared in the manifest, so it shows up
-// without any code running first. Everything that can fail happens after the
-// click, where the failure can be shown.
+// The entries are the same for every work item type, because a declared menu
+// action cannot look at the item. The dialog checks whether the action fits
+// the item's level and offers the ones that do when it does not.
 
 import * as SDK from "azure-devops-extension-sdk";
 import type { IHostPageLayoutService, IProjectPageService } from "azure-devops-extension-api";
 
-import { selectedIds } from "./model";
+import { type Action, MENU_ACTIONS, menuText, selectedIds } from "./model";
 
 // CommonServiceIds is a const enum, which has no runtime value to import.
 const SERVICES = {
   project: "ms.vss-tfs-web.tfs-page-data-service",
   layout: "ms.vss-features.host-page-layout-service",
 } as const;
-const PANEL_SIZE_LARGE = 2;
 
-async function open(context: unknown): Promise<void> {
+async function open(action: Action, context: unknown): Promise<void> {
   const layout = await SDK.getService<IHostPageLayoutService>(SERVICES.layout);
+  const title = `Etalii Spec Kit: ${menuText(action)}`;
   try {
     const ids = selectedIds(context);
     if (ids.length !== 1) {
       layout.openMessageDialog(
         ids.length === 0 ? "No work item was selected." : "Select a single work item; the chat is about one item at a time.",
-        { title: "Etalii Spec Kit", showCancel: false },
+        { title, showCancel: false },
       );
       return;
     }
@@ -34,20 +35,21 @@ async function open(context: unknown): Promise<void> {
     if (!project) {
       throw new Error("No project in context.");
     }
-    layout.openPanel<void>(`${SDK.getExtensionContext().id}.chat-panel`, {
-      title: "Etalii Spec Kit",
-      size: PANEL_SIZE_LARGE,
-      configuration: { id: ids[0], project: project.name },
+    layout.openCustomDialog<void>(`${SDK.getExtensionContext().id}.chat-panel`, {
+      title,
+      configuration: { action, id: ids[0], project: project.name },
     });
   } catch (error) {
     layout.openMessageDialog(`Could not open the chat: ${error instanceof Error ? error.message : String(error)}`, {
-      title: "Etalii Spec Kit",
+      title,
       showCancel: false,
     });
   }
 }
 
-SDK.register("etalii-spec-kit-menu", () => ({
-  execute: (context: unknown) => void open(context),
-}));
+for (const action of MENU_ACTIONS) {
+  SDK.register(`etalii-spec-kit-${action}`, () => ({
+    execute: (context: unknown) => void open(action, context),
+  }));
+}
 void SDK.init();

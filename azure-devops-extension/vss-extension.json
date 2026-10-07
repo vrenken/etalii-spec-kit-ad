@@ -30,9 +30,9 @@
   ],
   "contributions": [
     {
-      "id": "work-item-menu",
+      "id": "menu-describe",
       "type": "ms.vss-web.action",
-      "description": "Opens the Etalii Spec Kit chat for a work item",
+      "description": "Have a model write this item's specification",
       "targets": [
         "ms.vss-work-web.work-item-context-menu",
         "ms.vss-work-web.backlog-item-menu",
@@ -40,11 +40,119 @@
         "ms.vss-work-web.work-item-toolbar-menu"
       ],
       "properties": {
-        "text": "Etalii Spec Kit",
-        "title": "Work on this item's specification with a model",
+        "text": "Generate specification",
+        "title": "Have a model write this item's specification",
         "group": "contributed",
         "uri": "dist/menu.html",
-        "registeredObjectId": "etalii-spec-kit-menu"
+        "registeredObjectId": "etalii-spec-kit-describe"
+      }
+    },
+    {
+      "id": "menu-subdivide",
+      "type": "ms.vss-web.action",
+      "description": "Have a model break this item into items of the next level",
+      "targets": [
+        "ms.vss-work-web.work-item-context-menu",
+        "ms.vss-work-web.backlog-item-menu",
+        "ms.vss-work-web.backlog-board-card-item-menu",
+        "ms.vss-work-web.work-item-toolbar-menu"
+      ],
+      "properties": {
+        "text": "Subdivide",
+        "title": "Have a model break this item into items of the next level",
+        "group": "contributed",
+        "uri": "dist/menu.html",
+        "registeredObjectId": "etalii-spec-kit-subdivide"
+      }
+    },
+    {
+      "id": "menu-decompose",
+      "type": "ms.vss-web.action",
+      "description": "Have a model break this item into stories",
+      "targets": [
+        "ms.vss-work-web.work-item-context-menu",
+        "ms.vss-work-web.backlog-item-menu",
+        "ms.vss-work-web.backlog-board-card-item-menu",
+        "ms.vss-work-web.work-item-toolbar-menu"
+      ],
+      "properties": {
+        "text": "Decompose",
+        "title": "Have a model break this item into stories",
+        "group": "contributed",
+        "uri": "dist/menu.html",
+        "registeredObjectId": "etalii-spec-kit-decompose"
+      }
+    },
+    {
+      "id": "menu-plan",
+      "type": "ms.vss-web.action",
+      "description": "Have a model break this item into tasks",
+      "targets": [
+        "ms.vss-work-web.work-item-context-menu",
+        "ms.vss-work-web.backlog-item-menu",
+        "ms.vss-work-web.backlog-board-card-item-menu",
+        "ms.vss-work-web.work-item-toolbar-menu"
+      ],
+      "properties": {
+        "text": "Plan",
+        "title": "Have a model break this item into tasks",
+        "group": "contributed",
+        "uri": "dist/menu.html",
+        "registeredObjectId": "etalii-spec-kit-plan"
+      }
+    },
+    {
+      "id": "menu-regenerate",
+      "type": "ms.vss-web.action",
+      "description": "Have a model rewrite this item's specification from scratch",
+      "targets": [
+        "ms.vss-work-web.work-item-context-menu",
+        "ms.vss-work-web.backlog-item-menu",
+        "ms.vss-work-web.backlog-board-card-item-menu",
+        "ms.vss-work-web.work-item-toolbar-menu"
+      ],
+      "properties": {
+        "text": "Regenerate specification",
+        "title": "Have a model rewrite this item's specification from scratch",
+        "group": "contributed",
+        "uri": "dist/menu.html",
+        "registeredObjectId": "etalii-spec-kit-regenerate"
+      }
+    },
+    {
+      "id": "menu-refine",
+      "type": "ms.vss-web.action",
+      "description": "Improve this item's specification from your feedback",
+      "targets": [
+        "ms.vss-work-web.work-item-context-menu",
+        "ms.vss-work-web.backlog-item-menu",
+        "ms.vss-work-web.backlog-board-card-item-menu",
+        "ms.vss-work-web.work-item-toolbar-menu"
+      ],
+      "properties": {
+        "text": "Refine specification",
+        "title": "Improve this item's specification from your feedback",
+        "group": "contributed",
+        "uri": "dist/menu.html",
+        "registeredObjectId": "etalii-spec-kit-refine"
+      }
+    },
+    {
+      "id": "menu-analyse",
+      "type": "ms.vss-web.action",
+      "description": "Have a model check the children against this item and each other",
+      "targets": [
+        "ms.vss-work-web.work-item-context-menu",
+        "ms.vss-work-web.backlog-item-menu",
+        "ms.vss-work-web.backlog-board-card-item-menu",
+        "ms.vss-work-web.work-item-toolbar-menu"
+      ],
+      "properties": {
+        "text": "Analyse children for consistency",
+        "title": "Have a model check the children against this item and each other",
+        "group": "contributed",
+        "uri": "dist/menu.html",
+        "registeredObjectId": "etalii-spec-kit-analyse"
       }
     },
     {

@@ -27,17 +27,17 @@ import {
   systemPrompt,
 } from "./chat-model";
 import { type Conversation, startConversation } from "./llm";
-import { type Action, actionsForLevel, childTypeFor, levelOf, levelsFromBacklogs, menuText, requestPatch } from "./model";
+import { type Action, actionsForLevel, childTypeFor, levelOf, levelsFromBacklogs, menuText, requestPatch, resolveAction } from "./model";
 
 interface PanelConfiguration {
-  /** Filled in when the user picks an action in the panel. */
+  /** The menu pick; replaced by the action that fits the item's level. */
   action: Action;
   id: number;
   project: string;
   levels: string[][];
   level: number;
   childType?: string;
-  panel?: { close: (result?: unknown) => void };
+  dialog?: { close: (result?: unknown) => void };
 }
 
 const SETTINGS_KEY = "model-settings";
@@ -53,6 +53,7 @@ let item: WorkItem;
 let children: WorkItem[] = [];
 let proposal: Proposal | undefined;
 let busy = false;
+let ready = false; // an action that fits the item has been settled
 
 const client = () => getClient(WorkItemTrackingRestClient);
 
@@ -200,7 +201,7 @@ function renderProposal(): void {
 }
 
 function refreshControls(): void {
-  const chosen = Boolean(configuration.action);
+  const chosen = ready;
   ($("send") as HTMLButtonElement).disabled = busy || !chosen;
   ($("apply") as HTMLButtonElement).disabled = busy || !proposal;
   ($("queue") as HTMLButtonElement).disabled = busy || !chosen;
@@ -249,9 +250,9 @@ async function ask(text: string, shown?: string): Promise<void> {
 }
 
 function begin(): void {
-  if (!configuration.action) {
+  if (!ready) {
     showSettings(false);
-    return; // settings were saved before an action was picked
+    return; // settings were saved before the action was settled
   }
   const problem = settingsProblem(settings);
   if (problem) {
@@ -265,7 +266,6 @@ function begin(): void {
   refreshControls();
   conversation = startConversation(settings, systemPrompt(context));
   const notes = ($("notes") as HTMLTextAreaElement).value;
-  addBubble("notice", `${escapeHtml(menuText(configuration.action, configuration.childType))} for <b>${escapeHtml(context.item.type)} ${context.item.id}</b>: ${escapeHtml(context.item.title)}`);
   void ask(openingMessage(context, notes), notes.trim() || undefined);
   ($("notes") as HTMLTextAreaElement).value = "";
 }
@@ -310,6 +310,9 @@ async function start(): Promise<void> {
   await SDK.init({ applyTheme: true });
   await SDK.ready();
   configuration = SDK.getConfiguration() as PanelConfiguration;
+  // The frame cannot measure the host window, so size the dialog from the
+  // screen: about 70% wide and, allowing for browser chrome, 70% high.
+  SDK.resize(Math.round(window.screen.availWidth * 0.7), Math.round((window.screen.availHeight - 140) * 0.7));
 
   const dataService = await SDK.getService<IExtensionDataService>("ms.vss-features.extension-data-service");
   dataManager = await dataService.getExtensionDataManager(SDK.getExtensionContext().id, await SDK.getAccessToken());
@@ -364,52 +367,65 @@ async function start(): Promise<void> {
       setBusy(false);
     }
   });
-  $("close").addEventListener("click", () => configuration.panel?.close());
+  $("close").addEventListener("click", () => configuration.dialog?.close());
 
   refreshControls();
   try {
-    await showActions();
+    await prepare();
   } catch (error) {
     addBubble("error", `Could not load the work item: ${escapeHtml(error instanceof Error ? error.message : String(error))}`);
   }
 }
 
-/** Offer the actions that fit this work item's level; the pick starts the chat. */
-async function showActions(): Promise<void> {
+/**
+ * Check the menu pick against the item's level. When it fits, the chat starts
+ * straight away; when it does not, say so and offer the actions that do.
+ */
+async function prepare(): Promise<void> {
   const { id, project } = configuration;
   const [backlogs, workItem] = await Promise.all([
     getClient(WorkRestClient).getBacklogConfigurations({ project, team: SDK.getTeamContext()?.name, projectId: "", teamId: "" }),
     client().getWorkItem(id, project, ["System.WorkItemType", "System.Title"]),
   ]);
   const type = String(workItem.fields["System.WorkItemType"] ?? "");
+  $("subject").innerHTML = `<b>${escapeHtml(type)} ${id}</b> ${escapeHtml(String(workItem.fields["System.Title"] ?? ""))}`;
   configuration.levels = levelsFromBacklogs(backlogs);
   configuration.level = levelOf(type, configuration.levels);
-  const actions = actionsForLevel(configuration.level, configuration.levels.length);
-  const picker = $("picker");
-  picker.hidden = false;
-  const title = `<b>${escapeHtml(type)} ${id}</b>: ${escapeHtml(String(workItem.fields["System.Title"] ?? ""))}`;
-  if (actions.length === 0) {
-    picker.innerHTML = `<p>${title}</p><p>There are no actions for a ${escapeHtml(type)}. Pick an item above the task level of your backlog.</p>`;
+  const depth = configuration.levels.length;
+
+  const choose = async (action: Action) => {
+    $("picker").hidden = true;
+    configuration.action = action;
+    configuration.childType = childTypeFor(action, configuration.level, configuration.levels);
+    await loadContext();
+    ready = true;
+    begin();
+  };
+
+  const picked = resolveAction(configuration.action, configuration.level, depth);
+  if (picked) {
+    await choose(picked);
     return;
   }
-  picker.innerHTML = `<p>${title}</p><p>What would you like the model to do?</p>`;
-  for (const action of actions) {
-    const childType = childTypeFor(action, configuration.level, configuration.levels);
+  const available = actionsForLevel(configuration.level, depth);
+  const picker = $("picker");
+  picker.hidden = false;
+  const wanted = escapeHtml(menuText(configuration.action).toLowerCase());
+  if (available.length === 0) {
+    picker.innerHTML = `<p>"${wanted}" is not available for a ${escapeHtml(type)}. These actions work on the levels above tasks in your backlog.</p>`;
+    return;
+  }
+  picker.innerHTML = `<p>"${wanted}" does not fit a ${escapeHtml(type)}. Choose one of these instead:</p><div class="choices"></div>`;
+  for (const action of available) {
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = menuText(action, childType);
-    button.addEventListener("click", async () => {
-      picker.hidden = true;
-      configuration.action = action;
-      configuration.childType = childType;
-      try {
-        await loadContext();
-        begin();
-      } catch (error) {
+    button.textContent = menuText(action, childTypeFor(action, configuration.level, configuration.levels));
+    button.addEventListener("click", () => {
+      choose(action).catch((error: unknown) => {
         addBubble("error", `Could not load the work item: ${escapeHtml(error instanceof Error ? error.message : String(error))}`);
-      }
+      });
     });
-    picker.appendChild(button);
+    picker.querySelector(".choices")!.appendChild(button);
   }
 }
 
